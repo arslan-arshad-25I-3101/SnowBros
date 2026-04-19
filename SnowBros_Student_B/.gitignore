@@ -1,4 +1,4 @@
-# Visual Studio
+# Ignore Visual Studio specific files
 .vs/
 *.vcxproj.user
 *.sln.DotSettings.user
@@ -16,11 +16,15 @@ obj/
 *.o
 *.a
 *.so
+*.dylib
 
 # IDE files
+*.vcxproj
 *.vcxproj.filters
+*.sln
 .vscode/
 .idea/
+CMakeUserPresets.json
 
 # OS files
 .DS_Store
@@ -38,3 +42,9 @@ local_data.txt
 # Compiled objects
 *.obj
 *.pdb
+
+# CMake build directory
+build/
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles/

@@ -20,9 +20,10 @@ A C++ implementation of the classic Snow Bros arcade game using SFML for CS1004 
 - **Visual Studio Community 2026** (or compatible compiler)
 
 ### Building on Windows (Visual Studio)
-1. Open `SnowBros_Student_B.sln` in Visual Studio
-2. Select Build > Build Solution (Ctrl+Shift+B)
-3. Run with F5
+1. Open the project folder in Visual Studio
+2. VS auto-detects CMakeLists.txt
+3. Select Build > Build Solution (Ctrl+Shift+B)
+4. Run with F5
 
 ### Building with CMake
 ```bash
@@ -35,43 +36,28 @@ cmake --build . --config Release
 ## Project Structure
 
 ```
-SnowBros_Student_B/
+SnowBros/
+├── CMakeLists.txt                 # Build configuration
+├── main.cpp                       # Entry point
+├── README.md                      # Documentation
+├── DESIGN_DOCUMENT.txt            # Architecture guide
+├── .gitignore                     # Git rules
+│
 ├── src/
-│   ├── main.cpp                 # Entry point
-│   ├── Game.h / Game.cpp        # Main game loop & state machine
+│   ├── Game.h / Game.cpp
 │   ├── Entities/
-│   │   ├── Player.h / .cpp
-│   │   ├── Enemy.h / .cpp       # Abstract base class
-│   │   ├── Projectile.h / .cpp
-│   │   └── PowerUp.h / .cpp
-│   ├── Systems/
-│   │   ├── CollisionDetector.h / .cpp
-│   │   ├── InputManager.h / .cpp
-│   │   ├── AuthManager.h / .cpp
-│   │   ├── DatabaseManager.h / .cpp
-│   │   └── ScoreManager.h / .cpp
-│   ├── UI/
-│   │   ├── MainMenu.h / .cpp
-│   │   ├── HUD.h / .cpp
-│   │   ├── PauseMenu.h / .cpp
-│   │   └── Shop.h / .cpp
-│   ├── Levels/
-│   │   ├── LevelManager.h / .cpp
-│   │   └── LevelConfig.h
-│   └── Utils/
-│       ├── Logger.h / .cpp
-│       └── EventBus.h / .cpp
+│   │   ├── Entity.h / .cpp        # Base class
+│   │   ├── Enemy.h / .cpp         # Enemy base
+│   │   └── Botom.h / .cpp         # Example enemy
+│   └── Systems/
+│       └── EventBus.h / .cpp      # Observer pattern
+│
 ├── assets/
 │   ├── textures/
 │   ├── sounds/
 │   └── fonts/
-├── data/
-│   ├── users.db
-│   ├── levels_config.json
-│   └── leaderboard.txt
-├── CMakeLists.txt
-├── .gitignore
-└── README.md
+└── data/
+    └── (Database files, configs)
 ```
 
 ## Group Members
@@ -121,12 +107,6 @@ SnowBros_Student_B/
 5. Wait for review from your partner
 6. Merge to `develop` after approval
 7. Periodically merge `develop` → `main` for stable releases
-
-## Contact & Questions
-
-- For ambiguities, refer to the assignment specification
-- Document any design decisions in your code comments
-- Keep commit messages clear and descriptive
 
 ---
 
