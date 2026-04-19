@@ -7,6 +7,8 @@
  */
 
 #include "src/Game.h"
+#include <cstdlib>
+#include <ctime>
 
 /**
  * @brief Main entry point
@@ -14,6 +16,8 @@
  */
 int main()
 {
+    std::srand(static_cast<unsigned>(std::time(nullptr)));
+
     Game game;
 
     // Main game loop
