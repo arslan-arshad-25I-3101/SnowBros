@@ -1,0 +1,291 @@
+// ============================================================================
+// SNOW BROS - OOP DESIGN DOCUMENT
+// Group Project for CS1004: Object-Oriented Programming
+// ============================================================================
+
+/*
+PROJECT ARCHITECTURE OVERVIEW:
+
+1. CORE GAME LOOP (Student A responsibility)
+   - GameState enum: MENU, PLAYING, PAUSED, GAME_OVER, LEVEL_COMPLETE
+   - Main event loop with InputManager, CollisionDetector, and drawing
+   - Frame rate: 60 FPS target
+
+2. ENTITY SYSTEM (Split responsibility)
+   Abstract Base Classes:
+   - Entity: position, velocity, hitbox, active state
+   - Enemy: health, scoring, collision response
+   - Projectile: direction, speed, lifetime
+   - PowerUp: effect type, duration
+
+   Concrete Implementations (Student B):
+   - Player (spawned by Student A)
+   - All enemies and variants
+   - Snowballs
+   - Power-ups
+
+3. SYSTEMS ARCHITECTURE (Student B primary)
+   - AuthManager: Login/Registration/Sessions
+   - DatabaseManager: Save/Load/Leaderboard
+   - ScoreManager: Points calculation, chains
+   - EventBus: Observer pattern for decoupled communication
+   - CollisionDetector: Centralized collision logic
+
+4. UI LAYER (Student B primary)
+   - MainMenu: Login, New Game, Continue, Leaderboard
+   - HUD: Real-time score, lives, gems, level
+   - PauseMenu: Resume, Shop, Settings, Logout
+   - Shop: Buy items with gems
+   - Leaderboard: Top 10 scores
+
+5. LEVEL SYSTEM (Student A primary, Student B provides data)
+   - LevelManager: Load levels, spawn enemies, check completion
+   - LevelConfig: JSON-based configuration (no hardcoding!)
+   - BonusLevel: Random gem rain event
+
+============================================================================
+DESIGN PATTERNS USED:
+============================================================================
+
+1. FACTORY PATTERN
+   Location: EnemyFactory class
+   Purpose: Create different enemy types (Botom, Flyng, Tornado, etc.)
+   Usage: LevelManager calls EnemyFactory::CreateEnemy(type, level)
+   Benefit: Easy to add new enemy types without modifying LevelManager
+
+2. OBSERVER PATTERN
+   Location: EventBus class
+   Events Fired:
+     - OnEnemyKilled(score, position)
+     - OnPowerUpCollected(type, duration)
+     - OnLevelComplete(gems, score)
+     - OnBossDefeated(gemReward)
+   Listeners: ScoreManager, HUD, SoundManager
+   Benefit: Decoupled systems - UI responds to game events without tight coupling
+
+3. STATE PATTERN
+   Location: Boss attack behavior (Mogera, Gamakichi)
+   States: Attack, Cooldown, Phase2, Defeated
+   Benefit: Clean phase transitions for boss fights
+
+4. SINGLETON PATTERN (optional for managers)
+   Location: DatabaseManager, AudioManager, etc.
+   Usage: DatabaseManager::GetInstance()->SavePlayer()
+   Note: Use carefully - pass references when possible
+
+============================================================================
+CLASS HIERARCHY (INHERITANCE):
+============================================================================
+
+Entity (Abstract)
+├── Player
+├── Enemy (Abstract)
+│   ├── Botom (Standard)
+│   ├── FlyingEnemy : Botom
+│   │   ├── FlyingFooga
+│   │   └── Tornado
+│   ├── Boss (Abstract)
+│   │   ├── Mogera
+│   │   └── Gamakichi
+│   └── ColorVariant : Enemy (wrapper/decorator)
+├── Projectile (Abstract)
+│   ├── Snowball
+│   ├── Knife (Tornado projectile)
+│   └── Artillery (Gamakichi projectile)
+└── PowerUp (Abstract)
+    ├── SpeedBoost
+    ├── SnowballPower
+    ├── DistanceIncrease
+    └── BalloonMode
+
+UI (Abstract)
+├── Screen (Abstract)
+│   ├── MainMenu
+│   ├── CharacterSelect
+│   ├── GameHUD
+│   ├── PauseMenu
+│   ├── Shop
+│   ├── Leaderboard
+│   └── GameOver
+
+System (Abstract base for managers)
+├── AuthManager
+├── DatabaseManager
+├── ScoreManager
+├── EventBus
+├── InputManager
+├── CollisionDetector
+└── AudioManager
+
+============================================================================
+KEY OOP PRINCIPLES APPLIED:
+============================================================================
+
+ENCAPSULATION:
+- All entity state (position, velocity, health) is PRIVATE
+- Public getters/setters for safe access
+- Example:
+  class Enemy {
+      private:
+          sf::Vector2f position;
+          int health;
+      public:
+          sf::Vector2f GetPosition() const { return position; }
+          void SetPosition(const sf::Vector2f& pos) { position = pos; }
+  };
+
+INHERITANCE:
+- Enemy hierarchy demonstrates "is-a" relationships
+- FlyingEnemy : Botom (adds flight capability)
+- Tornado : FlyingEnemy (adds knife attacks)
+- Benefits: Code reuse, consistent interface
+
+POLYMORPHISM:
+- Virtual methods: update(), draw(), takeDamage()
+- Called on base class pointers/references
+- Each enemy overrides with unique behavior
+- Example:
+  void GameLoop() {
+      for (Enemy* enemy : enemies) {
+          enemy->update(deltaTime);  // Polymorphic call
+          enemy->draw(window);
+      }
+  }
+
+ABSTRACTION:
+- Enemy is abstract - no direct Enemy instances
+- Only concrete types (Botom, Tornado, etc.) instantiated
+- Interface defines contract: all enemies must implement update(), draw(), takeDamage()
+- Client code doesn't care about implementation details
+
+COMPOSITION:
+- Player HAS-A SnowballLauncher
+- Player HAS-A HitBox
+- Player HAS-A StatsComponent
+- Mogera HAS-A HealthBar
+- Better than inheritance in many cases
+
+============================================================================
+DATA-DRIVEN DESIGN (Critical for scalability):
+============================================================================
+
+NO HARDCODING!
+
+Instead of:
+  if (currentLevel == 5) spawnMogera();
+  if (currentLevel == 10) spawnGamakichi();
+
+Use LevelConfig:
+  LevelConfig levels[10] = {
+      {1, 3, {BOTOM, BOTOM, BOTOM}},
+      {2, 5, {BOTOM, BOTOM, BOTOM, BOTOM, BOTOM}},
+      {5, 2, {MOGERA}},  // Boss level
+      ...
+  };
+
+To extend from 10 to 20 levels, just add 10 more entries to the config array!
+
+============================================================================
+DATABASE SCHEMA (Student B):
+============================================================================
+
+users table:
+  - user_id (PRIMARY KEY)
+  - username (UNIQUE)
+  - password_hash
+  - email
+  - created_at
+
+player_progress table:
+  - progress_id (PRIMARY KEY)
+  - user_id (FOREIGN KEY)
+  - current_level
+  - lives_remaining
+  - gem_count
+  - high_score
+  - last_updated
+
+leaderboard table:
+  - entry_id (PRIMARY KEY)
+  - user_id (FOREIGN KEY)
+  - score
+  - level_reached
+  - recorded_at
+
+game_saves table:
+  - save_id (PRIMARY KEY)
+  - user_id (FOREIGN KEY)
+  - level_num
+  - lives
+  - gems
+  - score
+  - timestamp
+
+============================================================================
+COMMUNICATION BETWEEN STUDENT A & B:
+============================================================================
+
+STUDENT A → STUDENT B (Events):
+- Enemy killed → Student B updates score HUD
+- Player collected power-up → Student B applies effect
+- Level complete → Student B saves to database
+
+STUDENT B → STUDENT A (Data):
+- Player stats (lives, gems) → Affects gameplay
+- Saved level/progress → Used to continue game
+- Active power-ups → Affects snowball behavior
+
+INTEGRATION POINTS:
+1. Game loop calls EventBus events
+2. Player update/draw called from Student A's loop
+3. Collision detection called each frame
+4. HUD subscribed to EventBus for real-time updates
+5. Database auto-saves on level complete
+
+============================================================================
+INITIAL PUSH TO MAIN (What to include):
+============================================================================
+
+✅ PUSH TO MAIN:
+1. This design document (for reference)
+2. README.md with build instructions
+3. .gitignore (already created)
+4. CMakeLists.txt (basic project setup)
+5. SnowBros_Student_B.vcxproj files
+6. Header files with class declarations (interface design)
+7. Empty stub implementations
+
+❌ DO NOT PUSH:
+1. Debug/ or Release/ folders
+2. .vs/ folder
+3. *.exe, *.dll, *.lib files
+4. User-specific Visual Studio settings
+5. Large asset files initially (handle separately)
+
+============================================================================
+GIT WORKFLOW FOR TWO STUDENTS:
+============================================================================
+
+BRANCHES:
+1. main: Production-ready, stable builds only
+2. develop: Active development, integration branch
+3. feature/student-a-*: Student A's features
+4. feature/student-b-*: Student B's features
+
+WORKFLOW:
+1. Both start from develop branch
+2. Student A: git checkout -b feature/student-a-player-movement
+3. Student B: git checkout -b feature/student-b-auth-system
+4. Work independently, commit frequently
+5. When ready, push to remote and create Pull Request
+6. Partner reviews code
+7. Merge to develop after approval
+8. On milestones (every 2-3 days), merge develop → main
+
+COMMIT MESSAGES FORMAT:
+- [STUDENT_A/B] Component: brief description
+- Example: "[STUDENT_B] Auth: add password hashing with bcrypt"
+- Example: "[STUDENT_A] Player: implement jump mechanic"
+
+============================================================================
+*/

@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="SnowBros_Student_B/SnowBros_Student_B.vcxproj" Id="09e8d99b-a24c-4de8-8194-de1af3703554" />
+</Solution>
