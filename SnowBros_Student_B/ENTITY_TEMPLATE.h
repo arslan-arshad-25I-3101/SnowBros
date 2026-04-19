@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "Enemy.h"  // or Entity.h if not an enemy
+#include "Entity.h"  // or Entity.h if not an enemy
 
 /**
  * @brief Template Enemy Class
