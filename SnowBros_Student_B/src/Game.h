@@ -9,11 +9,6 @@
 
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <vector>
-#include <memory>
-
-class Entity;
-class Enemy;
 
 enum class GameState
 {
@@ -32,6 +27,10 @@ public:
      * @brief Constructor
      */
     Game();
+    /**
+     * @brief Destructor
+     */
+    ~Game();
 
     /**
      * @brief Main game loop - called repeatedly
@@ -74,17 +73,9 @@ private:
      */
     void HandleEvents();
 
-    /**
-     * @brief Update all game entities
-     * @param deltaTime Time since last frame
-     */
-    void UpdateEntities(float deltaTime);
-
     sf::RenderWindow window;                ///< Game window
     sf::Clock frameClock;                   ///< For measuring delta time
     GameState currentState;                 ///< Current game state
-    
-    std::vector<std::unique_ptr<Entity>> entities;  ///< All active entities
     
     bool debugMode;                         ///< Debug hitbox display toggle
 };

@@ -17,34 +17,32 @@ Botom::Botom(const sf::Vector2f& position)
     gravity(300.0f),
     onPlatform(true)
 {
-    // Create sprite (temporary - will be replaced with textures)
     sprite.setRadius(15.0f);
     sprite.setFillColor(sf::Color::Blue);
     sprite.setPosition(position);
-    
-    hitbox.width = 30.0f;
-    hitbox.height = 30.0f;
+
+    hitbox.size = sf::Vector2f(30.0f, 30.0f);
+    hitbox.position = position;
 }
 
 void Botom::Update(float deltaTime)
 {
-    if (!active || encased) return;
+    if (!active || encased)
+    {
+        return;
+    }
 
-    // Simple horizontal movement
-    velocity.x = stats.speed * direction;
+    velocity.x = static_cast<float>(stats.speed * direction);
     position.x += velocity.x * deltaTime;
 
-    // Apply gravity
     if (!onPlatform)
     {
         velocity.y += gravity * deltaTime;
         position.y += velocity.y * deltaTime;
     }
 
-    // Update sprite position
     sprite.setPosition(position);
-    hitbox.left = position.x;
-    hitbox.top = position.y;
+    hitbox.position = position;
 }
 
 void Botom::Draw(sf::RenderWindow& window)

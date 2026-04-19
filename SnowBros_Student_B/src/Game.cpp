@@ -4,62 +4,27 @@
  */
 
 #include "Game.h"
-#include "Entities/Entity.h"
-#include "Systems/EventBus.h"
 
 Game::Game()
-    : window(sf::VideoMode(800, 600), "Snow Bros - OOP Project"),
-      currentState(GameState::MainMenu),
+    : window(sf::VideoMode({800u, 600u}), "Snow Bros - OOP Project"),
+      currentState(GameState::Playing),
       debugMode(false)
 {
-    window.setFramerateLimit(60);  // 60 FPS target
+    window.setFramerateLimit(60);
 }
+
+Game::~Game() = default;
 
 bool Game::Update()
 {
     HandleEvents();
-
-    float deltaTime = frameClock.restart().asSeconds();
-
-    if (currentState == GameState::Playing)
-    {
-        UpdateEntities(deltaTime);
-    }
-
+    frameClock.restart();
     return window.isOpen();
 }
 
 void Game::Render()
 {
     window.clear(sf::Color::Black);
-
-    // Draw all active entities
-    for (auto& entity : entities)
-    {
-        if (entity->IsActive())
-        {
-            entity->Draw(window);
-        }
-    }
-
-    // Draw debug hitboxes if enabled
-    if (debugMode)
-    {
-        for (auto& entity : entities)
-        {
-            if (entity->IsActive())
-            {
-                sf::FloatRect hitbox = entity->GetHitBox();
-                sf::RectangleShape debugBox(sf::Vector2f(hitbox.width, hitbox.height));
-                debugBox.setPosition(hitbox.left, hitbox.top);
-                debugBox.setFillColor(sf::Color::Transparent);
-                debugBox.setOutlineColor(sf::Color::Red);
-                debugBox.setOutlineThickness(2.0f);
-                window.draw(debugBox);
-            }
-        }
-    }
-
     window.display();
 }
 
@@ -85,48 +50,22 @@ GameState Game::GetGameState() const
 
 void Game::HandleEvents()
 {
-    sf::Event event;
-    while (window.pollEvent(event))
+    while (auto event = window.pollEvent())
     {
-        if (event.type == sf::Event::Closed)
+        if (event->is<sf::Event::Closed>())
         {
             window.close();
         }
-        else if (event.type == sf::Event::KeyPressed)
+        else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
         {
-            if (event.key.code == sf::Keyboard::Escape)
+            if (keyPressed->scancode == sf::Keyboard::Scancode::Escape)
             {
-                if (currentState == GameState::Playing)
-                {
-                    currentState = GameState::Paused;
-                }
-                else if (currentState == GameState::Paused)
-                {
-                    currentState = GameState::Playing;
-                }
+                window.close();
             }
-            else if (event.key.code == sf::Keyboard::F1 || event.key.code == sf::Keyboard::H)
+            else if (keyPressed->scancode == sf::Keyboard::Scancode::F1)
             {
                 debugMode = !debugMode;
             }
         }
     }
-}
-
-void Game::UpdateEntities(float deltaTime)
-{
-    for (auto& entity : entities)
-    {
-        if (entity->IsActive())
-        {
-            entity->Update(deltaTime);
-        }
-    }
-
-    // Remove inactive entities
-    entities.erase(
-        std::remove_if(entities.begin(), entities.end(),
-            [](const std::unique_ptr<Entity>& e) { return !e->IsActive(); }),
-        entities.end()
-    );
 }

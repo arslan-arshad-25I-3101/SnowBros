@@ -6,9 +6,9 @@
 #include "Entity.h"
 
 Entity::Entity(const sf::Vector2f& position)
-    : position(position), velocity(0, 0), active(true)
+    : position(position), velocity(0.f, 0.f), active(true)
 {
-    hitbox = sf::FloatRect(position.x, position.y, 0, 0);
+    hitbox = sf::FloatRect(position, sf::Vector2f(0.f, 0.f));
 }
 
 sf::Vector2f Entity::GetPosition() const
@@ -19,8 +19,7 @@ sf::Vector2f Entity::GetPosition() const
 void Entity::SetPosition(const sf::Vector2f& pos)
 {
     position = pos;
-    hitbox.left = position.x;
-    hitbox.top = position.y;
+    hitbox.position = position;
 }
 
 sf::FloatRect Entity::GetHitBox() const
