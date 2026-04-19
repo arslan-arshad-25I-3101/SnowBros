@@ -4,6 +4,7 @@
  */
 
 #include "Game.h"
+#include <optional>
 
 Game::Game()
     : window(sf::VideoMode({800u, 600u}), "Snow Bros - OOP Project"),
@@ -50,21 +51,31 @@ GameState Game::GetGameState() const
 
 void Game::HandleEvents()
 {
-    while (auto event = window.pollEvent())
+    while (true)
     {
+        std::optional<sf::Event> event = window.pollEvent();
+        if (!event.has_value())
+        {
+            break;
+        }
+
         if (event->is<sf::Event::Closed>())
         {
             window.close();
         }
-        else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
+        else
         {
-            if (keyPressed->scancode == sf::Keyboard::Scancode::Escape)
+            const sf::Event::KeyPressed* keyPressed = event->getIf<sf::Event::KeyPressed>();
+            if (keyPressed != nullptr)
             {
-                window.close();
-            }
-            else if (keyPressed->scancode == sf::Keyboard::Scancode::F1)
-            {
-                debugMode = !debugMode;
+                if (keyPressed->scancode == sf::Keyboard::Scancode::Escape)
+                {
+                    window.close();
+                }
+                else if (keyPressed->scancode == sf::Keyboard::Scancode::F1)
+                {
+                    debugMode = !debugMode;
+                }
             }
         }
     }
