@@ -1,8 +1,3 @@
-/**
- * @file Game.cpp
- * @brief Implementation of main Game class
- */
-
 #include "Game.h"
 #include <optional>
 
