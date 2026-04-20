@@ -10,13 +10,15 @@
 #include <cstdlib>
 #include <ctime>
 
+using namespace std;
+
 /**
  * @brief Main entry point
  * @return Exit code (0 for success)
  */
 int main()
 {
-    std::srand(static_cast<unsigned>(std::time(nullptr)));
+    srand(static_cast<unsigned>(time(nullptr)));
 
     Game game;
 
