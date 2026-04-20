@@ -4,10 +4,12 @@
  */
 
 #include "Game.h"
-#include <optional>
+
+using namespace std;
+using namespace sf;
 
 Game::Game()
-    : window(sf::VideoMode({800u, 600u}), "Snow Bros - OOP Project"),
+    : window(VideoMode({800u, 600u}), "Snow Bros - OOP Project"),
       currentState(GameState::Playing),
       debugMode(false)
 {
@@ -25,11 +27,11 @@ bool Game::Update()
 
 void Game::Render()
 {
-    window.clear(sf::Color::Black);
+    window.clear(Color::Black);
     window.display();
 }
 
-sf::RenderWindow& Game::GetWindow()
+RenderWindow& Game::GetWindow()
 {
     return window;
 }
@@ -53,26 +55,26 @@ void Game::HandleEvents()
 {
     while (true)
     {
-        std::optional<sf::Event> event = window.pollEvent();
-        if (!event.has_value())
+        auto event = window.pollEvent();
+        if (!event)
         {
             break;
         }
 
-        if (event->is<sf::Event::Closed>())
+        if (event->is<Event::Closed>())
         {
             window.close();
         }
         else
         {
-            const sf::Event::KeyPressed* keyPressed = event->getIf<sf::Event::KeyPressed>();
+            const Event::KeyPressed* keyPressed = event->getIf<Event::KeyPressed>();
             if (keyPressed != nullptr)
             {
-                if (keyPressed->scancode == sf::Keyboard::Scancode::Escape)
+                if (keyPressed->scancode == Keyboard::Scancode::Escape)
                 {
                     window.close();
                 }
-                else if (keyPressed->scancode == sf::Keyboard::Scancode::F1)
+                else if (keyPressed->scancode == Keyboard::Scancode::F1)
                 {
                     debugMode = !debugMode;
                 }

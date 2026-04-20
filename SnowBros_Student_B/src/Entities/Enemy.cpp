@@ -6,7 +6,10 @@
 #include "Enemy.h"
 #include <cstdlib>
 
-Enemy::Enemy(const sf::Vector2f& position, const EnemyStats& stats)
+using namespace std;
+using namespace sf;
+
+Enemy::Enemy(const Vector2f& position, const EnemyStats& stats)
     : Entity(position), stats(stats), currentHealth(stats.health), encased(false)
 {
 }
@@ -35,7 +38,7 @@ int Enemy::GetHealth() const
 
 int Enemy::GetRandomScore() const
 {
-    return stats.scoreMin + (std::rand() % (stats.scoreMax - stats.scoreMin + 1));
+    return stats.scoreMin + (rand() % (stats.scoreMax - stats.scoreMin + 1));
 }
 
 bool Enemy::IsEncased() const
