@@ -1,12 +1,44 @@
 #include "Game.h"
 #include <optional>
-
+void vector(int*& a, int* n, int v) {
+    *n += 1;
+    int* arr = new int[*n];
+    for (int i = 0; i < *n; i++) {
+        if (i < *n - 1)
+            arr[i] = a[i];
+        else
+            arr[i] = v;
+    }
+    delete[] a;
+    a = nullptr;
+    a = arr;
+}
+void Game::vector(CircleShape*& s, int* n, CircleShape v) {
+    *n += 1;
+    CircleShape* arr = new CircleShape[*n];
+    for (int i = 0; i < *n; i++) {
+        if (i < *n - 1)
+            arr[i] = s[i];
+        else
+            arr[i] = v;
+    }
+    delete[] s;
+    s = nullptr;
+    s = arr;
+}
 Game::Game()
     : window(sf::VideoMode({800u, 600u}), "Snow Bros - OOP Project"),
       currentState(GameState::Playing),
       debugMode(false)
 {
     window.setFramerateLimit(60);
+}
+
+Game::Game(float r, string col, float x, float y) : window(sf::VideoMode({ 800u, 600u }), "Snow Bros - OOP Project"),currentState(GameState::Playing), debugMode(false) {
+window.setFramerateLimit(60);
+shape->setRadius(r);
+shape->setFillColor(Color::Blue);
+shape->setPosition({x, y});
 }
 
 Game::~Game() = default;
@@ -20,8 +52,11 @@ bool Game::Update()
 
 void Game::Render()
 {
+for(int i = 0; i < count; i++){
     window.clear(sf::Color::Black);
+    window.draw(*shape);
     window.display();
+    }
 }
 
 sf::RenderWindow& Game::GetWindow()
@@ -46,6 +81,7 @@ GameState Game::GetGameState() const
 
 void Game::HandleEvents()
 {
+
     while (true)
     {
         std::optional<sf::Event> event = window.pollEvent();
@@ -53,7 +89,12 @@ void Game::HandleEvents()
         {
             break;
         }
-
+        if (const auto* mouse = event->getIf<sf::Event::MouseButtonPressed>()) {
+            if (mouse->button == sf::Mouse::Button::Left) {
+                if (count < 30)
+                    count++;
+            }
+           }
         if (event->is<sf::Event::Closed>())
         {
             window.close();
@@ -73,5 +114,6 @@ void Game::HandleEvents()
                 }
             }
         }
+        Render();
     }
 }
