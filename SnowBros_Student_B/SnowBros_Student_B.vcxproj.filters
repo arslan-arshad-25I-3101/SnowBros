@@ -113,9 +113,6 @@
     <ClInclude Include="src\Enemies\ColorVariant.h">
       <Filter>Header Files\Enemies</Filter>
     </ClInclude>
-    <ClInclude Include="src\Enemies\FlyingEnemy.h">
-      <Filter>Header Files\Enemies</Filter>
-    </ClInclude>
     <ClInclude Include="src\Enemies\Boss.h">
       <Filter>Header Files\Enemies</Filter>
     </ClInclude>
@@ -125,14 +122,17 @@
     <ClInclude Include="src\Enemies\Tornado.h">
       <Filter>Header Files\Enemies</Filter>
     </ClInclude>
-    <ClInclude Include="src\Enemies\FlyingFooga.h">
-      <Filter>Header Files\Enemies</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Enemies\Gamakichi.h">
-      <Filter>Header Files\Enemies</Filter>
-    </ClInclude>
     <ClInclude Include="src\Systems\EventBus.h">
       <Filter>Header Files\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="FlyingEnemy.h">
+      <Filter>Header Files\Enemies</Filter>
+    </ClInclude>
+    <ClInclude Include="FlyingFooga.h">
+      <Filter>Header Files\Enemies</Filter>
+    </ClInclude>
+    <ClInclude Include="Gamakichi.h">
+      <Filter>Header Files\Enemies</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
