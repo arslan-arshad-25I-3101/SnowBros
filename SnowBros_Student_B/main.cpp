@@ -8,11 +8,18 @@ int main()
     RenderWindow window(VideoMode({800u,600u}), "HOPE");
     float r = 45.0f;
     int c = 0;
-    CircleShape shape(r);
-    shape.setPosition({250.0f, 125.0f});
+    Texture tex[3];
+    tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
+    tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
+    tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
+    Sprite player(tex[0]);
+    player.setOrigin({97.f/2.f, 89.f/2.f});
+    player.setPosition({350.f, 200.f});
+    Clock clock;
+    int frame = 0;
+    float frametime = 0.15f;
     window.setFramerateLimit(60.0f);
-    float x = shape.getPosition().x;
-    float y = shape.getPosition().y;
+   
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
@@ -25,30 +32,40 @@ int main()
                 r -= 3;
                 else
                 cout << "No thx\n";
-                    shape.setRadius(r);
+                    
                 }
             }
-            if (Keyboard::isKeyPressed(Keyboard::Key::W)) {
-            shape.move({+0.0f, -2.25f});
+        }
+       /* if (Keyboard::isKeyPressed(Keyboard::Key::W)) {
+            shape.move({ +0.0f, -2.25f });
+        }
+        if (Keyboard::isKeyPressed(Keyboard::Key::S)) {
+            shape.move({ +0.0f, +2.25f });
+        }*/
+        if (Keyboard::isKeyPressed(Keyboard::Key::A)) {
+            player.move({ -2.25f, -0.0f });
+            player.setScale({ 1.f,1.f });
+            if (clock.getElapsedTime().asSeconds() > frametime) {
+                frame++;
+                if (frame >= 3)
+                    frame = 0;
+                player.setTexture(tex[frame]);
+                clock.restart();
             }
-            if (Keyboard::isKeyPressed(Keyboard::Key::S)) {
-                shape.move({ +0.0f, +2.25f });
-            }
-            if (Keyboard::isKeyPressed(Keyboard::Key::A)) {
-                shape.move({ -2.25f, -0.0f });
-            }
-            if (Keyboard::isKeyPressed(Keyboard::Key::D)) {
-                shape.move({ +2.25f, -0.0f });
-            }
-            if (Keyboard::isKeyPressed(Keyboard::Key::Space)) {
-               
-                shape.move({+0.0f, -5.5f});
-                if(c >= 60 && x != shape.getPosition().x && y != shape.getPosition().y)
-                shape.move({+0.0, +5.5});
+        }
+        if (Keyboard::isKeyPressed(Keyboard::Key::D)) {
+            player.move({ +2.25f, -0.0f });
+            player.setScale({-1.f,1.f});
+            if (clock.getElapsedTime().asSeconds() > frametime) {
+            frame++;
+            if(frame >= 3)
+            frame = 0;
+            player.setTexture(tex[frame]);
+            clock.restart();
             }
         }
         window.clear(Color::Black);
-        window.draw(shape);
+        window.draw(player);
         window.display();
         c++;
         if(c >= 60 && c%60 == 0)
