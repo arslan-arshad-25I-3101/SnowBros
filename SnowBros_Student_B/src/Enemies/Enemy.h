@@ -61,6 +61,8 @@ public:
      */
     const EnemyStats& GetStats() const;
 
+    
+
 protected:
     /**
      * @brief Protected constructor - only derived classes can instantiate

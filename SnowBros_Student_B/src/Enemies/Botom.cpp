@@ -5,7 +5,9 @@
 
 #include "Botom.h"
 
-Botom::Botom(const sf::Vector2f& position)
+using namespace sf;
+
+Botom::Botom(const Vector2f& position)
     : Enemy(position, EnemyStats{
         .health = 2,
         .speed = 50,
@@ -18,10 +20,10 @@ Botom::Botom(const sf::Vector2f& position)
     onPlatform(true)
 {
     sprite.setRadius(15.0f);
-    sprite.setFillColor(sf::Color::Blue);
+    sprite.setFillColor(Color::Blue);
     sprite.setPosition(position);
 
-    hitbox.size = sf::Vector2f(30.0f, 30.0f);
+    hitbox.size = Vector2f(30.0f, 30.0f);
     hitbox.position = position;
 }
 
@@ -45,7 +47,7 @@ void Botom::Update(float deltaTime)
     hitbox.position = position;
 }
 
-void Botom::Draw(sf::RenderWindow& window)
+void Botom::Draw(RenderWindow& window)
 {
     if (active)
     {

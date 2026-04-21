@@ -9,6 +9,8 @@
 #pragma once
 #include "Enemy.h"
 
+using namespace sf;
+
 class Botom : public Enemy
 {
 public:
@@ -38,8 +40,10 @@ public:
     bool TakeDamage(int damage) override;
 
 protected:
-    sf::CircleShape sprite;     ///< Simple circle sprite for now
+    Sprite* sprite; ///< Simple circle sprite for now
     int direction;              ///< Movement direction: -1 (left) or 1 (right)
     float gravity;              ///< Gravity acceleration
     bool onPlatform;            ///< Whether standing on platform
+
+
 };
