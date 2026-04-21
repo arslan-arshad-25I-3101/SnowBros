@@ -77,7 +77,7 @@ DESIGN PATTERNS USED:
 CLASS HIERARCHY (INHERITANCE):
 ============================================================================
 
-Entity (Abstract)
+Entity (Abstract) 
 ├── Player
 ├── Enemy (Abstract)
 │   ├── Botom (Standard)
@@ -153,7 +153,7 @@ POLYMORPHISM:
   }
 
 ABSTRACTION:
-- Enemy is abstract - no direct Enemy instances
+- Enemy is abstract - no direct Enemy instance s
 - Only concrete types (Botom, Tornado, etc.) instantiated
 - Interface defines contract: all enemies must implement update(), draw(), takeDamage()
 - Client code doesn't care about implementation details

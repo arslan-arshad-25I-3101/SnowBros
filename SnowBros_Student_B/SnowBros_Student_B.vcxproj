@@ -139,9 +139,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Systems\AuthManager.cpp" />
+    <ClCompile Include="src\Systems\DatabaseManager.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="src\Entities\Botom.cpp" />
-    <ClCompile Include="src\Entities\Enemy.cpp" />
+    <ClCompile Include="src\Systems\ScoreManager.cpp" />
+    <ClCompile Include="src\Systems\EventBus.cpp" />
+    <ClCompile Include="src\Enemies\Boss.cpp" />
+    <ClCompile Include="src\Enemies\ColorVariant.cpp" />
+    <ClCompile Include="src\Enemies\FlyingEnemy.cpp" />
+    <ClCompile Include="src\Enemies\FlyingFooga.cpp" />
+    <ClCompile Include="src\Enemies\Gamakichi.cpp" />
+    <ClCompile Include="src\Enemies\Mogera.cpp" />
+    <ClCompile Include="src\Enemies\Tornado.cpp" />
+    <ClCompile Include="src\Enemies\Botom.cpp" />
+    <ClCompile Include="src\Enemies\Enemy.cpp" />
     <ClCompile Include="src\Entities\Entity.cpp" />
     <ClCompile Include="src\Game.cpp" />
   </ItemGroup>
@@ -164,9 +175,18 @@
     <Text Include="DESIGN_DOCUMENT.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Systems\AuthManager.h" />
+    <ClInclude Include="src\Systems\EventBus.h" />
     <ClInclude Include="ENTITY_TEMPLATE.h" />
-    <ClInclude Include="src\Entities\Botom.h" />
-    <ClInclude Include="src\Entities\Enemy.h" />
+    <ClInclude Include="src\Enemies\Boss.h" />
+    <ClInclude Include="src\Enemies\ColorVariant.h" />
+    <ClInclude Include="src\Enemies\FlyingEnemy.h" />
+    <ClInclude Include="src\Enemies\FlyingFooga.h" />
+    <ClInclude Include="src\Enemies\Gamakichi.h" />
+    <ClInclude Include="src\Enemies\Mogera.h" />
+    <ClInclude Include="src\Enemies\Botom.h" />
+    <ClInclude Include="src\Enemies\Enemy.h" />
+    <ClInclude Include="src\Enemies\Tornado.h" />
     <ClInclude Include="src\Entities\Entity.h" />
     <ClInclude Include="src\Game.h" />
   </ItemGroup>
@@ -174,3 +194,5 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+
+

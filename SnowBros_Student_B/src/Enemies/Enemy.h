@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "Entity.h"
+#include "../Entities/Entity.h"
 
 /// Damage model for enemies
 struct EnemyStats
