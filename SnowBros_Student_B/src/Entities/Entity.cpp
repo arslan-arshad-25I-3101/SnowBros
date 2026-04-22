@@ -1,8 +1,3 @@
-/**
- * @file Entity.cpp
- * @brief Implementation of base Entity class
- */
-
 #include "Entity.h"
 
 Entity::Entity(const sf::Vector2f& position)
