@@ -139,6 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Maps\TileMap.cpp" />
     <ClCompile Include="src\Systems\AuthManager.cpp" />
     <ClCompile Include="src\Systems\DatabaseManager.cpp" />
     <ClCompile Include="main.cpp" />
@@ -178,6 +179,7 @@
     <ClInclude Include="FlyingEnemy.h" />
     <ClInclude Include="FlyingFooga.h" />
     <ClInclude Include="Gamakichi.h" />
+    <ClInclude Include="src\Maps\TileMap.h" />
     <ClInclude Include="src\Systems\AuthManager.h" />
     <ClInclude Include="src\Systems\EventBus.h" />
     <ClInclude Include="ENTITY_TEMPLATE.h" />
