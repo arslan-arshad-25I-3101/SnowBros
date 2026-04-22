@@ -1,8 +1,3 @@
-/**
- * @file Botom.cpp
- * @brief Implementation of Botom enemy
- */
-
 #include "Botom.h"
 
 using namespace sf;

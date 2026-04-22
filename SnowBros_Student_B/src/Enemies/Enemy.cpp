@@ -1,8 +1,3 @@
-/**
- * @file Enemy.cpp
- * @brief Implementation of abstract Enemy class
- */
-
 #include "Enemy.h"
 #include <cstdlib>
 
