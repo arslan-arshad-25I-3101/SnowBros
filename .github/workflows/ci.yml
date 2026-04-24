@@ -1,0 +1,248 @@
+# ============================================================
+# Snow Bros - CI/CD Pipeline
+# Runs on every push and pull request to main/develop
+# Tells you exactly what broke and where
+# ============================================================
+
+name: Snow Bros CI
+
+on:
+  push:
+    branches: [ main, develop, "feature/**", "bugfix/**", "hotfix/**" ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Cancel any in-progress run for the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ─────────────────────────────────────────────
+  # JOB 1: Quick style / obvious mistake checks
+  # Runs first (fast, < 1 min) so you get instant
+  # feedback before the full compile even starts
+  # ─────────────────────────────────────────────
+  lint:
+    name: "🔍 Lint & Style Checks"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Enforce header guards / #pragma once
+      - name: Check for missing header guards
+        run: |
+          echo "Checking header files for #pragma once..."
+          MISSING=0
+          for f in $(find src -name "*.h"); do
+            if ! grep -q "#pragma once" "$f"; then
+              echo "❌  MISSING #pragma once in: $f"
+              MISSING=1
+            fi
+          done
+          if [ $MISSING -eq 1 ]; then
+            echo ""
+            echo "Fix: Add '#pragma once' at the very top of each .h file listed above."
+            exit 1
+          fi
+          echo "✅  All headers have #pragma once"
+
+      # Catch accidental 'using namespace std' in headers (bad practice)
+      - name: Check for 'using namespace' in headers
+        run: |
+          echo "Checking for 'using namespace' in header files..."
+          FOUND=0
+          for f in $(find src -name "*.h"); do
+            if grep -n "using namespace" "$f"; then
+              echo "❌  Found 'using namespace' in header: $f"
+              FOUND=1
+            fi
+          done
+          if [ $FOUND -eq 1 ]; then
+            echo ""
+            echo "Fix: Remove 'using namespace' from .h files."
+            echo "     Use full qualifiers (e.g. sf::Vector2f) in headers."
+            echo "     'using namespace' in headers pollutes every file that includes yours."
+            exit 1
+          fi
+          echo "✅  No 'using namespace' found in headers"
+
+      # Warn if TODO/FIXME are committed to main
+      - name: Check for unresolved TODOs on main/develop
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+        run: |
+          echo "Checking for TODO / FIXME comments..."
+          COUNT=$(grep -rn "TODO\|FIXME" src/ --include="*.cpp" --include="*.h" | wc -l)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "⚠️  Found $COUNT TODO/FIXME comment(s) — resolve before merging to main:"
+            grep -rn "TODO\|FIXME" src/ --include="*.cpp" --include="*.h"
+          else
+            echo "✅  No unresolved TODOs"
+          fi
+
+      # Check no compiled/IDE files were accidentally committed
+      - name: Check for accidentally committed build artifacts
+        run: |
+          echo "Checking for committed binary / IDE files..."
+          BAD_FILES=$(git ls-files | grep -E "\.(exe|dll|lib|obj|pdb|vcxproj|sln|filters|user)$" || true)
+          if [ -n "$BAD_FILES" ]; then
+            echo "❌  The following files should NOT be committed:"
+            echo "$BAD_FILES"
+            echo ""
+            echo "Fix: Add these extensions to your .gitignore and run:"
+            echo "     git rm --cached <filename>"
+            exit 1
+          fi
+          echo "✅  No binary/IDE artifacts in repo"
+
+      # Ensure CMakeLists.txt exists
+      - name: Check CMakeLists.txt exists
+        run: |
+          if [ ! -f "CMakeLists.txt" ]; then
+            echo "❌  CMakeLists.txt is missing from the repo root!"
+            echo "Fix: Add your CMakeLists.txt and commit it."
+            exit 1
+          fi
+          echo "✅  CMakeLists.txt found"
+
+
+  # ─────────────────────────────────────────────
+  # JOB 2: Full build on Windows (Visual Studio)
+  # Mirrors what both students use locally
+  # ─────────────────────────────────────────────
+  build-windows:
+    name: "🪟 Build — Windows (MSVC)"
+    runs-on: windows-latest
+    needs: lint   # Only runs if lint passed
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Cache vcpkg so SFML doesn't re-download every run
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-sfml-windows-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: vcpkg-sfml-windows-
+
+      - name: Install SFML via vcpkg
+        run: |
+          cd C:\vcpkg
+          git pull
+          .\bootstrap-vcpkg.bat -disableMetrics
+          .\vcpkg install sfml:x64-windows
+          .\vcpkg integrate install
+        shell: pwsh
+
+      - name: Configure CMake
+        run: |
+          cmake -B build `
+                -G "Visual Studio 17 2022" `
+                -A x64 `
+                -DCMAKE_BUILD_TYPE=Release `
+                -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        shell: pwsh
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+        shell: pwsh
+
+      # Upload the .exe so you can download and test it from the Actions tab
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SnowBros-Windows-${{ github.sha }}
+          path: build/Release/*.exe
+          if-no-files-found: warn
+
+
+  # ─────────────────────────────────────────────
+  # JOB 3: Full build on Linux (GCC)
+  # Catches Windows-only #include paths and other
+  # portability bugs early
+  # ─────────────────────────────────────────────
+  build-linux:
+    name: "🐧 Build — Linux (GCC)"
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SFML (apt)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            libsfml-dev \
+            cmake \
+            build-essential
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+                -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --config Release --parallel $(nproc)
+
+      # Report file sizes so you can spot unexpectedly large binaries
+      - name: Report binary size
+        run: |
+          echo "--- Build output sizes ---"
+          find build -name "SnowBros*" -type f -exec ls -lh {} \;
+
+
+  # ─────────────────────────────────────────────
+  # JOB 4: PR Summary — posts a comment on every
+  # Pull Request with a pass/fail summary so your
+  # partner knows exactly what to fix before merge
+  # ─────────────────────────────────────────────
+  pr-summary:
+    name: "📋 PR Check Summary"
+    runs-on: ubuntu-latest
+    needs: [ lint, build-windows, build-linux ]
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Post summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lint         = '${{ needs.lint.result }}';
+            const buildWindows = '${{ needs.build-windows.result }}';
+            const buildLinux   = '${{ needs.build-linux.result }}';
+
+            const icon = r => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌';
+            const allOk = [lint, buildWindows, buildLinux].every(r => r === 'success');
+
+            const body = [
+              `## Snow Bros CI — ${allOk ? '✅ All checks passed!' : '❌ Some checks failed'}`,
+              '',
+              '| Check | Result |',
+              '|-------|--------|',
+              `| 🔍 Lint & style | ${icon(lint)} ${lint} |`,
+              `| 🪟 Windows build | ${icon(buildWindows)} ${buildWindows} |`,
+              `| 🐧 Linux build   | ${icon(buildLinux)} ${buildLinux} |`,
+              '',
+              allOk
+                ? '**Safe to merge.** All jobs passed.'
+                : '**Do NOT merge yet.** Click the failed job above to see the exact error and which file/line caused it.',
+              '',
+              `_Triggered by commit \`${{ github.sha }}\` · ${{ github.actor }}_`
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });

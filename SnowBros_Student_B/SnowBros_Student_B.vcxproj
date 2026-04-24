@@ -139,6 +139,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Enemies\Botom.cpp" />
+    <ClCompile Include="src\Levels\LevelData.cpp" />
+    <ClCompile Include="src\Maps\TileMap.cpp" />
     <ClCompile Include="src\Systems\AuthManager.cpp" />
     <ClCompile Include="src\Systems\DatabaseManager.cpp" />
     <ClCompile Include="main.cpp" />
@@ -151,7 +154,6 @@
     <ClCompile Include="src\Enemies\Gamakichi.cpp" />
     <ClCompile Include="src\Enemies\Mogera.cpp" />
     <ClCompile Include="src\Enemies\Tornado.cpp" />
-    <ClCompile Include="src\Enemies\Botom.cpp" />
     <ClCompile Include="src\Enemies\Enemy.cpp" />
     <ClCompile Include="src\Entities\Entity.cpp" />
     <ClCompile Include="src\Game.cpp" />
@@ -178,13 +180,15 @@
     <ClInclude Include="FlyingEnemy.h" />
     <ClInclude Include="FlyingFooga.h" />
     <ClInclude Include="Gamakichi.h" />
+    <ClInclude Include="src\Enemies\Botom.h" />
+    <ClInclude Include="src\Levels\LevelData.h" />
+    <ClInclude Include="src\Maps\TileMap.h" />
     <ClInclude Include="src\Systems\AuthManager.h" />
     <ClInclude Include="src\Systems\EventBus.h" />
     <ClInclude Include="ENTITY_TEMPLATE.h" />
     <ClInclude Include="src\Enemies\Boss.h" />
     <ClInclude Include="src\Enemies\ColorVariant.h" />
     <ClInclude Include="src\Enemies\Mogera.h" />
-    <ClInclude Include="src\Enemies\Botom.h" />
     <ClInclude Include="src\Enemies\Enemy.h" />
     <ClInclude Include="src\Enemies\Tornado.h" />
     <ClInclude Include="src\Entities\Entity.h" />

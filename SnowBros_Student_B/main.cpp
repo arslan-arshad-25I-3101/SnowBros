@@ -1,9 +1,16 @@
 #include "src/Game.h"
 #include <cstdlib>
 #include <ctime>
+// Quick-fix includes for testing in main.cpp
+#include <SFML/Graphics.hpp>
+#include <iostream>
+#include "src/Levels/LevelData.h"
+
+using namespace std;
+using namespace sf;
 
 class Botom {
-    protected:
+protected:
     bool mv1 = false;
     Texture tex[3];
     Clock clocks;
@@ -11,342 +18,284 @@ class Botom {
     float frametime = 0.15f;
     Sprite* enemy;
     FloatRect bounds;
-    public:
-        Botom() {
-            tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
-            tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
-            tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
-            enemy = new Sprite(tex[0]);
+public:
+    Botom() {
+        tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
+        tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
+        tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
+        enemy = new Sprite(tex[0]);
     }
-        void movement() {
-            if ( mv1 == true) {
-                enemy->move({ -2.25f, -0.0f });
-                enemy->setScale({ 1.f,1.f });
-                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                    (frames)++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
+    void movement() {
+        if (mv1 == true) {
+            enemy->move({ -2.25f, -0.0f });
+            enemy->setScale({ 1.f,1.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (frames)++;
+                if (frames >= 3)
+                    frames = 0;
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
 
-                }
             }
-            else if (mv1 == false) {
-                enemy->move({ +2.25f, -0.0f });
-                enemy->setScale({ -1.f,1.f });
-                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                    (frames)++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
+        }
+        else if (mv1 == false) {
+            enemy->move({ +2.25f, -0.0f });
+            enemy->setScale({ -1.f,1.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (frames)++;
+                if (frames >= 3)
+                    frames = 0;
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
             }
-            if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200)
-                mv1 = true;
-            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
-                mv1 = false;
-            
+        }
+        if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200)
+            mv1 = true;
+        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
+            mv1 = false;
+
     }
-        Sprite getEnemy() {
+    Sprite getEnemy() {
         return *enemy;
     }
-        void setPos(float i) {
-            enemy->setPosition({ 350.f, 65.f + i * 65.f });
+    void setPos(float i) {
+        enemy->setPosition({ 350.f, 65.f + i * 65.f });
     }
-        void setOrigin(float x, float y) {
-            enemy->setOrigin({x,y});
+    void setOrigin(float x, float y) {
+        enemy->setOrigin({ x,y });
     }
-        void setmv1(bool x) {
+    void setmv1(bool x) {
         mv1 = x;
     }
-        bool getmv1() {
-            return mv1;
+    bool getmv1() {
+        return mv1;
     }
-        FloatRect boun() {
-            return enemy->getGlobalBounds();
-        }
-        ~Botom() {
-          delete enemy;
-          enemy = nullptr;
+    FloatRect boun() {
+        return enemy->getGlobalBounds();
+    }
+    ~Botom() {
+        delete enemy;
+        enemy = nullptr;
     }
 };
 
 void mover(int n, Botom* other) {
     for (int i = 0; i < n; i++) {
         other[i].movement();
-}
+    }
 }
 
 void Draw(int n, Botom* other, RenderWindow& window) {
     for (int i = 0; i < n; i++) {
-    window.draw(other[i].getEnemy());
-}
+        window.draw(other[i].getEnemy());
+    }
 }
 
 void setPos(float x, float y, int n, Botom* other) {
     for (int i = 0; i < n; i++) {
-        other[i].setOrigin(x,y);
+        other[i].setOrigin(x, y);
         other[i].setPos(i);
-        if(i % 2 == 1)
-        other[i].setmv1(false);
+        if (i % 2 == 1)
+            other[i].setmv1(false);
         else
-        other[i].setmv1(true);
+            other[i].setmv1(true);
     }
 }
 
 class Tiles {
-    private:
-    Texture text;
-    Sprite* tile;
+private:
+    RectangleShape tile;
     FloatRect bounds;
-    public:
-        Tiles() {
-            text.loadFromFile("tileset/tile_1.png");
-            tile = new Sprite(text);
+
+public:
+    Tiles() {
+        tile.setSize({ Level::TILE_W, Level::TILE_H });
+        tile.setFillColor(Color(255, 0, 0, 191));
+        //tile.setOutlineThickness(0.f);
     }
-        void setpost(int i) {
-            tile->setPosition({0.f+i*74.6f, 540.f});
+
+    void setpost(float x, float y) {
+        tile.setPosition({ x, y });
     }
-        void setsca(float x, float y) {
-            tile->setScale({95.f/x, 90.f/y});
+
+    void Draw(RenderWindow& window) {
+        window.draw(tile);
     }
-        void Draw(RenderWindow& window) {
-            window.draw(*tile);
-    }
-        FloatRect boun()  {
-            return tile->getGlobalBounds();
-        }
-        ~Tiles() {
-            delete tile;
-            tile = nullptr;
+
+    FloatRect boun() {
+        return tile.getGlobalBounds();
     }
 };
 
 class Player : public Botom {
-    protected:
+protected:
     bool isJump;
-    public:
-        Player() {
-            tex[0].loadFromFile("nick/nick_1.png");
-            tex[1].loadFromFile("nick/nick_2.png");
-            tex[2].loadFromFile("nick/nick_3.png");
-            enemy = new Sprite(tex[0]);
+public:
+    Player() {
+        tex[0].loadFromFile("nick/nick_1.png");
+        tex[1].loadFromFile("nick/nick_2.png");
+        tex[2].loadFromFile("nick/nick_3.png");
+        delete enemy;
+        enemy = new Sprite(tex[0]);
     }
-        void move(Keyboard::Key key) {
-            if (key == Keyboard::Key::A) {
-                enemy->move({ -2.25f, -0.0f });
-                enemy->setScale({ 1.f,1.f });
-                if (clocks.getElapsedTime().asSeconds() > frametime) {
-                    frames++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
+    void move(Keyboard::Key key) {
+        if (key == Keyboard::Key::A) {
+            enemy->move({ -2.25f, -0.0f });
+            enemy->setScale({ 1.f,1.f });
+            if (clocks.getElapsedTime().asSeconds() > frametime) {
+                frames++;
+                if (frames >= 3)
+                    frames = 0;
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
             }
-            if (key == Keyboard::Key::D ) {
-                enemy->move({ +2.25f, -0.0f });
-                enemy->setScale({ -1.f,1.f });
-                if (clocks.getElapsedTime().asSeconds() > frametime) {
-                    frames++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
+        }
+        if (key == Keyboard::Key::D) {
+            enemy->move({ +2.25f, -0.0f });
+            enemy->setScale({ -1.f,1.f });
+            if (clocks.getElapsedTime().asSeconds() > frametime) {
+                frames++;
+                if (frames >= 3)
+                    frames = 0;
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
             }
-            if (key == Keyboard::Key::W) {
-                enemy->move({ +0.0f, -2.25f });
-                enemy->setScale({ 1.f,1.f });
-                if (clocks.getElapsedTime().asSeconds() > frametime) {
-                    frames++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
+        }
+        if (key == Keyboard::Key::W) {
+            enemy->move({ +0.0f, -2.25f });
+            enemy->setScale({ 1.f,1.f });
+            if (clocks.getElapsedTime().asSeconds() > frametime) {
+                frames++;
+                if (frames >= 3)
+                    frames = 0;
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
             }
-            if (key == Keyboard::Key::S) {
-                enemy->move({ +0.0f, +2.25f });
-                enemy->setScale({ 1.f,1.f });
-                if (clocks.getElapsedTime().asSeconds() > frametime) {
-                    frames++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
+        }
+        if (key == Keyboard::Key::S) {
+            enemy->move({ +0.0f, +2.25f });
+            enemy->setScale({ 1.f,1.f });
+            if (clocks.getElapsedTime().asSeconds() > frametime) {
+                frames++;
+                if (frames >= 3)
+                    frames = 0;
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
             }
-            if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200)
-                mv1 = true;
-            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
-                mv1 = false;
+        }
+        if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200)
+            mv1 = true;
+        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
+            mv1 = false;
     }
-        Sprite Draw() {
-            return *enemy;
+    Sprite Draw() {
+        return *enemy;
     }
-        void Setorigin(float x, float y) {
+    void Setorigin(float x, float y) {
 
     }
-        ~Player() {
-            delete enemy;
-            enemy = nullptr;
+    ~Player() {
     }
 };
 
 
+/////////////////// LOADING LEVELS //////////////////////////////
+
+
+
+void LoadLevel(
+    int levelNo,
+    Level& level,
+    Texture& bgTex,
+    Sprite& background,
+    Tiles*& tilt,
+    int& count)
+{
+    // choose level
+    if (levelNo == 1) SetupLevel1(level);
+    else if (levelNo == 2) SetupLevel2(level);
+    else if (levelNo == 3) SetupLevel3(level);
+    else if (levelNo == 4) SetupLevel4(level);
+    else if (levelNo == 5) SetupLevel5(level);
+    else if (levelNo == 6) SetupLevel6(level);
+    else if (levelNo == 7) SetupLevel7(level);
+    else if (levelNo == 8) SetupLevel8(level);
+    else if (levelNo == 9) SetupLevel9(level);
+    else if (levelNo == 10) SetupLevel10(level);
+
+    bgTex.loadFromFile(level.backgroundPath);
+    background = Sprite(bgTex);
+
+    // CHANGE LATER (check if the re-scale is needed)
+
+    if (bgTex.getSize().x > 0 && bgTex.getSize().y > 0) {
+        level.bgRect = IntRect({ 0, 0 }, { (int)bgTex.getSize().x, (int)bgTex.getSize().y });
+        background.setTextureRect(level.bgRect);
+        background.setScale({ 800.f / (float)bgTex.getSize().x, 600.f / (float)bgTex.getSize().y });
+    }
+
+    if (tilt != nullptr) {
+        delete[] tilt;
+        tilt = nullptr;
+    }
+
+    count = 0;
+    for (int r = 0; r < Level::ROWS; r++)
+        for (int c = 0; c < Level::COLS; c++)
+            if (level.grid[r][c] != 0) count++;
+
+    tilt = new Tiles[count];
+    int idx = 0;
+    for (int r = 0; r < Level::ROWS; r++) {
+        for (int c = 0; c < Level::COLS; c++) {
+            if (level.grid[r][c] != 0) {
+                tilt[idx].setpost(c * Level::TILE_W, r * Level::TILE_H);
+                idx++;
+            }
+        }
+    }
+}
+
+
+///////////////////////////////////// LEVEL LOADING END ////////////////////////////////////
+
 int main()
 {
-    cout << "How many botoms do you want to create? ";
-    int opt;
-    cin >> opt;
-    RenderWindow window(VideoMode({ 1200u,800u }), "HOPE");
-    //------------- for background --------------
-    Texture wintex;
-    wintex.loadFromFile("Maps/Map_1.png");
-    Sprite background(wintex);
-    background.setScale({1200.f/wintex.getSize().x, 800.f/wintex.getSize().y});
-    //------------ End of background ------------
+    RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
 
-    //---------------- For tiles ---------------
-    Texture tiles;
-    tiles.loadFromFile("tileset/tile_1.png");
-    Tiles tilt[12];
-    for(int i = 0; i < 12; i++)
-    tilt[i].setsca(121.f, 121.f);
-    for (int i = 0; i < 12; i++) {
-        if (i < 4) {
-            tilt[i].setpost(i);
-        }
-        else if(i >= 4 && i <= 7)
-        tilt[i].setpost(i+2);
-        else
-        tilt[i].setpost(i+4);
-    }
-  
-    //--------------- End of tiles -----------------
-    Botom* botom = new Botom[opt];
-    float x = 97.f/2.f;
-    float y = 89.f/2.f;
-    setPos(x, y, opt, botom);
+    Level level_1;
+    Texture bgTex;
+    Sprite background(bgTex);
+    Tiles* tilt = nullptr;
+    int count = 0;
 
-    //--------------- Player -----------------
-    Player play;
-    x = 210.f/2.f;
-    y = 267.f/2.f;
-    play.setOrigin(x, y);
-    play.setPos(4);
-    //------------- Player End----------------
-    window.setFramerateLimit(60.0f);
+    LoadLevel(1, level_1, bgTex, background, tilt, count);
+
+    Level* currentLevel = &level_1;
+
+    window.setFramerateLimit(60);
+
     while (window.isOpen())
     {
-        while (const std::optional event = window.pollEvent())
+        while (true)
         {
-            if (event->is<sf::Event::Closed>())
+            auto event = window.pollEvent();
+            if (!event.has_value())
+                break;
+
+            if (event->is<Event::Closed>())
                 window.close();
-            if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
-            play.move(keyPressed->code);
-                }
         }
-        mover(opt, botom);
-       
+
         window.clear(Color::Black);
-         Draw(opt, botom, window);
-      window.draw(play.Draw());
-        window.display();
-        for (int i = 0; i < opt; i++) {
-            if (play.boun().findIntersection(botom[i].boun())) {
-                if (botom[i].getmv1() == false)
-                    botom[i].setmv1(true);
-                else if (botom[i].getmv1() == true)
-                    botom[i].setmv1(false);
-            }
+        window.draw(background);
+        for (int i = 0; i < count; i++) {
+            tilt[i].Draw(window);
         }
+        window.display();
     }
-    delete[] botom;
-  /*  delete[] tile;
-    tile = nullptr;*/
-    botom = nullptr;
+
+    delete[] tilt;
+    tilt = nullptr;
     return 0;
 }
-
-//------------ For drawing ugly mfs and tiles
-/* for (int i = 0; i < 12; i++) {
-           tilt[i].Draw(window);
-       }*/
-     
-
-// ------------- For bounary checking-------------
-/*for (int i = 0; i < opt; i++) {
-            for (int j = 0; j < 12; j++) {
-                if (botom[i].boun().findIntersection(tilt[j].boun())) {
-                    if (botom[i].getmv1() == false)
-                        botom[i].setmv1(true);
-                    else if (botom[i].getmv1() == true)
-                        botom[i].setmv1(false);
-                }
-            }
-        }*/
-
-//player movement
-  /* if (Keyboard::isKeyPressed(Keyboard::Key::W)) {
-            player.move({ +0.0f, -2.25f });
-        }
-        if (Keyboard::isKeyPressed(Keyboard::Key::S)) {
-            player.move({ +0.0f, +2.25f });
-        }
-        if (Keyboard::isKeyPressed(Keyboard::Key::A)) {
-            player.move({ -2.25f, -0.0f });
-            player.setScale({ 1.f,1.f });
-            if (clock.getElapsedTime().asSeconds() > frametime) {
-                frame++;
-                if (frame >= 3)
-                    frame = 0;
-                player.setTexture(tex[frame]);
-                clock.restart();
-            }
-        }
-        if (Keyboard::isKeyPressed(Keyboard::Key::D)) {
-            player.move({ +2.25f, -0.0f });
-            player.setScale({-1.f,1.f});
-            if (clock.getElapsedTime().asSeconds() > frametime) {
-            frame++;
-            if(frame >= 3)
-            frame = 0;
-            player.setTexture(tex[frame]);
-            clock.restart();
-            }
-        }*/
-
-       /* c++;
-        if (c >= 60 && c % 60 == 0)
-            cout << "Fps = 60\n";*/
-/*if (player.getPosition().x <= 800 && mv == true) {
-    player.move({ -2.25f, -0.0f });
-    player.setScale({ 1.f,1.f });
-    if (clock.getElapsedTime().asSeconds() > frametime) {
-        frame++;
-        if (frame >= 3)
-            frame = 0;
-        player.setTexture(tex[frame]);
-        clock.restart();
-
-    }
-}
-else if (player.getPosition().x >= 0 && mv == false) {
-    player.move({ +2.25f, -0.0f });
-    player.setScale({ -1.f,1.f });
-    if (clock.getElapsedTime().asSeconds() > frametime) {
-        frame++;
-        if (frame >= 3)
-            frame = 0;
-        player.setTexture(tex[frame]);
-        clock.restart();
-
-    }
-}
-if (player.getPosition().x == 800)
-mv = true;
-if (player.getPosition().x >= 0 && player.getPosition().x <= 15)
-mv = false;*/
