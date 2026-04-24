@@ -65,8 +65,8 @@ protected:
     Entity(const sf::Vector2f& position = sf::Vector2f(0, 0));
 
     int frames = 0;
-    Clock clock;
-    Texture text[3];
+    sf::Clock clock;
+    sf::Texture text[3];
     bool boundaryChecker;
     float frameTime = 0.15f;
 
