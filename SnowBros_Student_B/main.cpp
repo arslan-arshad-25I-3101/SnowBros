@@ -1,7 +1,7 @@
 #include "src/Game.h"
 #include <cstdlib>
 #include <ctime>
-
+#include "LevelData.h"
 class Botom {
     protected:
     bool mv1 = false;
@@ -95,33 +95,59 @@ void setPos(float x, float y, int n, Botom* other) {
     }
 }
 
+//class Tiles {
+//    private:
+//    Texture text;
+//    Sprite* tile;
+//    FloatRect bounds;
+//    public:
+//        Tiles() {
+//            text.loadFromFile("tileset/tile_1.png");
+//            tile = new Sprite(text);
+//    }
+//        void setpost(int i) {
+//            tile->setPosition({0.f+i*74.6f, 540.f});
+//    }
+//        void setsca(float x, float y) {
+//            tile->setScale({95.f/x, 90.f/y});
+//    }
+//        void Draw(RenderWindow& window) {
+//            window.draw(*tile);
+//    }
+//        FloatRect boun()  {
+//            return tile->getGlobalBounds();
+//        }
+//        ~Tiles() {
+//            delete tile;
+//            tile = nullptr;
+//    }
+//};
+
 class Tiles {
-    private:
-    Texture text;
-    Sprite* tile;
+private:
+    RectangleShape tile;
     FloatRect bounds;
-    public:
-        Tiles() {
-            text.loadFromFile("tileset/tile_1.png");
-            tile = new Sprite(text);
+
+public:
+    Tiles() {
+        tile.setSize({ Level::TILE_W, Level::TILE_H });
+        tile.setFillColor(Color(255, 0, 0, 191));
+        //tile.setOutlineThickness(0.f);
     }
-        void setpost(int i) {
-            tile->setPosition({0.f+i*74.6f, 540.f});
+
+    void setpost(float x, float y) {
+        tile.setPosition({ x, y });
     }
-        void setsca(float x, float y) {
-            tile->setScale({95.f/x, 90.f/y});
+
+    void Draw(RenderWindow& window) {
+        window.draw(tile);
     }
-        void Draw(RenderWindow& window) {
-            window.draw(*tile);
-    }
-        FloatRect boun()  {
-            return tile->getGlobalBounds();
-        }
-        ~Tiles() {
-            delete tile;
-            tile = nullptr;
+
+    FloatRect boun() {
+        return tile.getGlobalBounds();
     }
 };
+
 
 class Player : public Botom {
     protected:
@@ -195,35 +221,76 @@ class Player : public Botom {
     }
 };
 
+void LoadLevel(
+    int levelNo,
+    Level& level,
+    Texture& bgTex,
+    Sprite& background,
+    Tiles*& tilt,
+    int& count)
+{
+    // choose level
+    if (levelNo == 1) SetupLevel1(level);
+    else if (levelNo == 2) SetupLevel2(level);
+    else if (levelNo == 3) SetupLevel3(level);
+    else if (levelNo == 4) SetupLevel4(level);
+    else if (levelNo == 5) SetupLevel5(level);
+    else if (levelNo == 6) SetupLevel6(level);
+    else if (levelNo == 7) SetupLevel7(level);
+    else if (levelNo == 8) SetupLevel8(level);
+    else if (levelNo == 9) SetupLevel9(level);
+    else if (levelNo == 10) SetupLevel10(level);
+
+    bgTex.loadFromFile(level.backgroundPath);
+    background = Sprite(bgTex);
+
+    // CHANGE LATER (check if the re-scale is needed)
+
+    if (bgTex.getSize().x > 0 && bgTex.getSize().y > 0) {
+        level.bgRect = IntRect({ 0, 0 }, { (int)bgTex.getSize().x, (int)bgTex.getSize().y });
+        background.setTextureRect(level.bgRect);
+        background.setScale({ 800.f / (float)bgTex.getSize().x, 600.f / (float)bgTex.getSize().y });
+    }
+
+    if (tilt != nullptr) {
+        delete[] tilt;
+        tilt = nullptr;
+    }
+
+    count = 0;
+    for (int r = 0; r < Level::ROWS; r++)
+        for (int c = 0; c < Level::COLS; c++)
+            if (level.grid[r][c] != 0) count++;
+
+    tilt = new Tiles[count];
+    int idx = 0;
+    for (int r = 0; r < Level::ROWS; r++) {
+        for (int c = 0; c < Level::COLS; c++) {
+            if (level.grid[r][c] != 0) {
+                tilt[idx].setpost(c * Level::TILE_W, r * Level::TILE_H);
+                idx++;
+            }
+        }
+    }
+}
+
 
 int main()
 {
     cout << "How many botoms do you want to create? ";
     int opt;
     cin >> opt;
-    RenderWindow window(VideoMode({ 1200u,800u }), "HOPE");
+    RenderWindow window(VideoMode({ 800u,600u }), "HOPE");
     //------------- for background --------------
+  
+
     Texture wintex;
     wintex.loadFromFile("Maps/Map_1.png");
     Sprite background(wintex);
     background.setScale({1200.f/wintex.getSize().x, 800.f/wintex.getSize().y});
     //------------ End of background ------------
 
-    //---------------- For tiles ---------------
-    Texture tiles;
-    tiles.loadFromFile("tileset/tile_1.png");
-    Tiles tilt[12];
-    for(int i = 0; i < 12; i++)
-    tilt[i].setsca(121.f, 121.f);
-    for (int i = 0; i < 12; i++) {
-        if (i < 4) {
-            tilt[i].setpost(i);
-        }
-        else if(i >= 4 && i <= 7)
-        tilt[i].setpost(i+2);
-        else
-        tilt[i].setpost(i+4);
-    }
+   
   
     //--------------- End of tiles -----------------
     Botom* botom = new Botom[opt];
@@ -252,6 +319,7 @@ int main()
         mover(opt, botom);
        
         window.clear(Color::Black);
+       
          Draw(opt, botom, window);
       window.draw(play.Draw());
         window.display();
@@ -265,8 +333,7 @@ int main()
         }
     }
     delete[] botom;
-  /*  delete[] tile;
-    tile = nullptr;*/
+ 
     botom = nullptr;
     return 0;
 }
