@@ -2,23 +2,34 @@
 #include <cstdlib>
 #include <ctime>
 
+
+
+
+
 class Botom {
     protected:
     bool mv1 = false;
-    Texture tex[3];
+    Texture tex[4];
     Clock clocks;
     int frames = 0;
     float frametime = 0.15f;
     Sprite* enemy;
     FloatRect bounds;
+    int pausef;
     public:
         Botom() {
             tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
             tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
             tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
+            tex[3].loadFromFile("botom_orange/Botom_bruh.png");
             enemy = new Sprite(tex[0]);
     }
         void movement() {
+            if (pausef > 0) {
+                enemy->setTexture(tex[3]);
+                pausef--;
+            }
+           else{
             if ( mv1 == true) {
                 enemy->move({ -2.25f, -0.0f });
                 enemy->setScale({ 1.f,1.f });
@@ -42,10 +53,20 @@ class Botom {
                     clocks.restart();
                 }
             }
-            if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200)
+        
+        
+            if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200){
                 mv1 = true;
-            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
+                enemy->setTexture(tex[3]);
+                pausef = 60;
+                }
+            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50){
                 mv1 = false;
+                enemy->setTexture(tex[3]);
+                pausef = 60;
+                }
+            }
+            
             
     }
         Sprite getEnemy() {
@@ -95,33 +116,35 @@ void setPos(float x, float y, int n, Botom* other) {
     }
 }
 
-class Tiles {
-    private:
-    Texture text;
-    Sprite* tile;
-    FloatRect bounds;
-    public:
-        Tiles() {
-            text.loadFromFile("tileset/tile_1.png");
-            tile = new Sprite(text);
-    }
-        void setpost(int i) {
-            tile->setPosition({0.f+i*74.6f, 540.f});
-    }
-        void setsca(float x, float y) {
-            tile->setScale({95.f/x, 90.f/y});
-    }
-        void Draw(RenderWindow& window) {
-            window.draw(*tile);
-    }
-        FloatRect boun()  {
-            return tile->getGlobalBounds();
-        }
-        ~Tiles() {
-            delete tile;
-            tile = nullptr;
-    }
-};
+//class Tiles {
+//    private:
+//    Texture text;
+//    Sprite* tile;
+//    FloatRect bounds;
+//    public:
+//        Tiles() {
+//            text.loadFromFile("tileset/tile_1.png");
+//            tile = new Sprite(text);
+//    }
+//        void setpost(int i) {
+//            tile->setPosition({0.f+i*74.6f, 540.f});
+//    }
+//        void setsca(float x, float y) {
+//            tile->setScale({95.f/x, 90.f/y});
+//    }
+//        void Draw(RenderWindow& window) {
+//            window.draw(*tile);
+//    }
+//        FloatRect boun()  {
+//            return tile->getGlobalBounds();
+//        }
+//        ~Tiles() {
+//            delete tile;
+//            tile = nullptr;
+//    }
+//};
+
+
 
 class Player : public Botom {
     protected:
@@ -136,7 +159,7 @@ class Player : public Botom {
         void move(Keyboard::Key key) {
             if (key == Keyboard::Key::A) {
                 enemy->move({ -2.25f, -0.0f });
-                enemy->setScale({ 1.f,1.f });
+                enemy->setScale({ 210.f / 620, 267.f / 550 });
                 if (clocks.getElapsedTime().asSeconds() > frametime) {
                     frames++;
                     if (frames >= 3)
@@ -147,7 +170,7 @@ class Player : public Botom {
             }
             if (key == Keyboard::Key::D ) {
                 enemy->move({ +2.25f, -0.0f });
-                enemy->setScale({ -1.f,1.f });
+                enemy->setScale({ -210.f / 620, 267.f / 550 });
                 if (clocks.getElapsedTime().asSeconds() > frametime) {
                     frames++;
                     if (frames >= 3)
@@ -189,6 +212,12 @@ class Player : public Botom {
         void Setorigin(float x, float y) {
 
     }
+        void setsca(float x, float y) {
+            enemy->setScale({ 210.f / x, 267.f / y });
+        }
+        void setpost() {
+            enemy->setPosition({ 110.25f, 187.43f });
+        }
         ~Player() {
             delete enemy;
             enemy = nullptr;
@@ -210,7 +239,7 @@ int main()
     //------------ End of background ------------
 
     //---------------- For tiles ---------------
-    Texture tiles;
+   /* Texture tiles;
     tiles.loadFromFile("tileset/tile_1.png");
     Tiles tilt[12];
     for(int i = 0; i < 12; i++)
@@ -223,7 +252,7 @@ int main()
         tilt[i].setpost(i+2);
         else
         tilt[i].setpost(i+4);
-    }
+    }*/
   
     //--------------- End of tiles -----------------
     Botom* botom = new Botom[opt];
@@ -237,6 +266,8 @@ int main()
     y = 267.f/2.f;
     play.setOrigin(x, y);
     play.setPos(4);
+    play.setsca(620.f, 550.f);
+    
     //------------- Player End----------------
     window.setFramerateLimit(60.0f);
     while (window.isOpen())
