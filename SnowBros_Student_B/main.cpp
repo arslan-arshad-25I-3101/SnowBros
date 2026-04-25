@@ -12,47 +12,64 @@ using namespace sf;
 class Botom {
 protected:
     bool mv1 = false;
-    Texture tex[3];
+    Texture tex[4];
     Clock clocks;
     int frames = 0;
     float frametime = 0.15f;
     Sprite* enemy;
     FloatRect bounds;
+    float pausef = 0;
 public:
     Botom() {
         tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
         tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
         tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
+        tex[3].loadFromFile("botom_orange/Botom_bruh.png");
         enemy = new Sprite(tex[0]);
     }
     void movement() {
-        if (mv1 == true) {
-            enemy->move({ -2.25f, -0.0f });
-            enemy->setScale({ 97.f / 121.f,89.f / 121.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
+        if (pausef > 0) {
+            enemy->setTexture(tex[3]);
+            pausef--;
+        }
+        else {
+            if (mv1 == true) {
+                enemy->move({ -2.25f, -0.0f });
+                enemy->setScale({ 97.f/121.f,89.f/121.f });
+                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                    (frames)++;
+                    if (frames >= 3)
+                        frames = 0;
+                    enemy->setTexture(tex[frames]);
+                    clocks.restart();
 
+                }
+            }
+            else if (mv1 == false) {
+                enemy->move({ +2.25f, -0.0f });
+                enemy->setScale({ -97.f/121.f,89.f/121.f });
+                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                    (frames)++;
+                    if (frames >= 3)
+                        frames = 0;
+                    enemy->setTexture(tex[frames]);
+                    clocks.restart();
+                }
+            }
+
+
+            if (enemy->getPosition().x >= 750 && enemy->getPosition().x <= 800) {
+                mv1 = true;
+                enemy->setTexture(tex[3]);
+                pausef = 60;
+            }
+            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
+                mv1 = false;
+                enemy->setTexture(tex[3]);
+                pausef = 60;
             }
         }
-        else if (mv1 == false) {
-            enemy->move({ +2.25f, -0.0f });
-            enemy->setScale({ -97.f / 121.f,89.f / 121.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-            }
-        }
-        if (enemy->getPosition().x >= 750 && enemy->getPosition().x <= 800)
-            mv1 = true;
-        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
-            mv1 = false;
+
 
     }
     Sprite getEnemy() {
