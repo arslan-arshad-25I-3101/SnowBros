@@ -28,7 +28,7 @@ public:
     void movement() {
         if (mv1 == true) {
             enemy->move({ -2.25f, -0.0f });
-            enemy->setScale({ 1.f,1.f });
+            enemy->setScale({ 97.f / 121.f,89.f / 121.f });
             if ((clocks.getElapsedTime().asSeconds()) > frametime) {
                 (frames)++;
                 if (frames >= 3)
@@ -40,7 +40,7 @@ public:
         }
         else if (mv1 == false) {
             enemy->move({ +2.25f, -0.0f });
-            enemy->setScale({ -1.f,1.f });
+            enemy->setScale({ -97.f / 121.f,89.f / 121.f });
             if ((clocks.getElapsedTime().asSeconds()) > frametime) {
                 (frames)++;
                 if (frames >= 3)
@@ -49,7 +49,7 @@ public:
                 clocks.restart();
             }
         }
-        if (enemy->getPosition().x >= 1150 && enemy->getPosition().x <= 1200)
+        if (enemy->getPosition().x >= 750 && enemy->getPosition().x <= 800)
             mv1 = true;
         if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50)
             mv1 = false;
@@ -61,6 +61,10 @@ public:
     void setPos(float i) {
         enemy->setPosition({ 350.f, 65.f + i * 65.f });
     }
+    void setPos(float x, float y, float xx, float yy) {
+        enemy->setOrigin({xx,yy});
+        enemy->setPosition({x,y});
+    }
     void setOrigin(float x, float y) {
         enemy->setOrigin({ x,y });
     }
@@ -69,6 +73,9 @@ public:
     }
     bool getmv1() {
         return mv1;
+    }
+    void setScale(float x, float y) {
+        enemy->setScale({97.f/x,89.f/y});
     }
     FloatRect boun() {
         return enemy->getGlobalBounds();
@@ -261,6 +268,9 @@ void LoadLevel(
 
 int main()
 {
+    cout << "How many botoms do you want to create? ";
+    int opt;
+    cin >> opt;
     RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
 
     Level level_1;
@@ -272,6 +282,20 @@ int main()
     LoadLevel(1, level_1, bgTex, background, tilt, count);
 
     Level* currentLevel = &level_1;
+
+    //-----------------Ugly mfs-------------------
+    Botom* botom = new Botom[opt];
+    float x = 97.f / 2.f;
+    float y = 89.f / 2.f;
+    //setPos(x, y, opt, botom);
+    botom[0].setPos(155.f, 125.f, x, y);
+    botom[1].setPos(355.f, 125.f, x, y);
+    botom[2].setPos(155.f, 275.f, x, y);
+    botom[3].setPos(555.f, 275.f, x, y);
+    botom[4].setPos(400.f, 365.f, x, y);
+    for(int i = 0; i < opt; i++)
+    botom[i].setScale(151.f, 151.f);
+
 
     window.setFramerateLimit(60);
 
@@ -286,16 +310,29 @@ int main()
             if (event->is<Event::Closed>())
                 window.close();
         }
-
+        mover(opt, botom);
         window.clear(Color::Black);
         window.draw(background);
         for (int i = 0; i < count; i++) {
             tilt[i].Draw(window);
         }
+        Draw(opt, botom, window);
         window.display();
+        for (int i = 0; i < count; i++) {
+            for (int j = 0; j < opt; j++) {
+                if (tilt[i].boun().findIntersection(botom[j].boun())) {
+                    if (botom[j].getmv1() == false)
+                        botom[j].setmv1(true);
+                    else if (botom[j].getmv1() == true)
+                        botom[j].setmv1(false);
+                }
+            }
+        }
     }
 
     delete[] tilt;
+    delete[] botom;
     tilt = nullptr;
+    botom = nullptr;
     return 0;
 }
