@@ -1,7 +1,9 @@
 #include "src/Game.h"
 #include <cstdlib>
 #include <ctime>
+
 #include "LevelData.h"
+
 class Botom {
     protected:
     bool mv1 = false;
@@ -95,6 +97,35 @@ void setPos(float x, float y, int n, Botom* other) {
     }
 }
 
+
+class Tiles {
+    private:
+    Texture text;
+    Sprite* tile;
+    FloatRect bounds;
+    public:
+        Tiles() {
+            text.loadFromFile("tileset/tile_1.png");
+            tile = new Sprite(text);
+    }
+        void setpost(int i) {
+            tile->setPosition({0.f+i*74.6f, 540.f});
+    }
+        void setsca(float x, float y) {
+            tile->setScale({95.f/x, 90.f/y});
+    }
+        void Draw(RenderWindow& window) {
+            window.draw(*tile);
+    }
+        FloatRect boun()  {
+            return tile->getGlobalBounds();
+        }
+        ~Tiles() {
+            delete tile;
+            tile = nullptr;
+    }
+};
+
 //class Tiles {
 //    private:
 //    Texture text;
@@ -147,6 +178,7 @@ public:
         return tile.getGlobalBounds();
     }
 };
+
 
 
 class Player : public Botom {
@@ -290,7 +322,25 @@ int main()
     background.setScale({1200.f/wintex.getSize().x, 800.f/wintex.getSize().y});
     //------------ End of background ------------
 
+
+    //---------------- For tiles ---------------
+    Texture tiles;
+    tiles.loadFromFile("tileset/tile_1.png");
+    Tiles tilt[12];
+    for(int i = 0; i < 12; i++)
+    tilt[i].setsca(121.f, 121.f);
+    for (int i = 0; i < 12; i++) {
+        if (i < 4) {
+            tilt[i].setpost(i);
+        }
+        else if(i >= 4 && i <= 7)
+        tilt[i].setpost(i+2);
+        else
+        tilt[i].setpost(i+4);
+    }
+
    
+
   
     //--------------- End of tiles -----------------
     Botom* botom = new Botom[opt];
