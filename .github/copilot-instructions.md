@@ -5,6 +5,7 @@
 - User wants code to be written at a first-year Software Engineering level: simple, functional, and not expert-level/over-engineered.
 - User prefers first-year level C++ and wants simpler code over advanced patterns.
 - Use `using namespace std;` and `using namespace sf;` to avoid repeated `std::`/`sf::` qualifiers.
+- User has not studied `constexpr` yet and prefers using `const` instead.
 
 ## Project-Specific Rules
 - User requested scaffolding-only changes for enemy architecture tasks: create/move header and cpp files without implementing code.
