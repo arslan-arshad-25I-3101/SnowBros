@@ -9,8 +9,8 @@ using namespace sf;
 struct Level {
     static const int ROWS = 14;
     static const int COLS = 16;
-    static constexpr float TILE_W = 800.f / COLS;
-    static constexpr float TILE_H = 600.f / ROWS;
+    static const float TILE_W;
+    static const float TILE_H;
 
     string backgroundPath;
     IntRect bgRect;
