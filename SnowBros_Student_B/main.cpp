@@ -24,9 +24,14 @@ protected:
     bool onGround = false;    // can only jump if standing on something
 public:
     Botom() {
-        tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
-        tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
-        tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
+        bool ok0 = tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
+        bool ok1 = tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
+        bool ok2 = tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
+
+        if (!ok0) tex[0].loadFromFile("Characters/Enemies/nick_1.png");
+        if (!ok1) tex[1].loadFromFile("Characters/Enemies/nick_2.png");
+        if (!ok2) tex[2].loadFromFile("Characters/Enemies/nick_3.png");
+
         enemy = new Sprite(tex[0]);
     }
     void movement() {
@@ -135,6 +140,142 @@ public:
     }
 };
 
+
+//////////////////////////////// SNOWBALL CLASS //////////////////////////////////////
+
+class Snowball {
+public:
+    static Texture sharedTexture;
+    Sprite snowball;
+    IntRect projFrames[2];
+    int frameIndex;
+    float renderScale;
+    float velocityX;
+    float velocityY;
+    float gravity;
+    bool active;
+    Clock clock;
+    Clock animClock;
+
+    Snowball() : snowball(sharedTexture) {
+        if (sharedTexture.getSize().x == 0 || sharedTexture.getSize().y == 0) {
+            sharedTexture.loadFromFile("Sprite Sheet/Items.png");
+        }
+        snowball.setTexture(sharedTexture);
+
+        projFrames[0] = IntRect({ 307, 1121 }, { 179, 152 }); // blue blob
+        projFrames[1] = IntRect({ 487, 1115 }, { 161, 161 }); // orange burst
+
+        frameIndex = 0;
+        snowball.setTextureRect(projFrames[frameIndex]);
+        snowball.setOrigin({ projFrames[frameIndex].size.x / 2.f, projFrames[frameIndex].size.y / 2.f });
+
+        float sx = (Level::TILE_W * 0.8f) / (float)projFrames[frameIndex].size.x;
+        float sy = (Level::TILE_H * 0.8f) / (float)projFrames[frameIndex].size.y;
+        renderScale = (sx < sy) ? sx : sy;
+        snowball.setScale({ renderScale, renderScale });
+
+        active = false;
+        velocityX = 0.f;
+        velocityY = 0.f;
+        gravity = 0.3f;
+    }
+
+    void spawn(float x, float y, float directionX) {
+        float spawnX = x + directionX * (Level::TILE_W * 0.65f);
+        float spawnY = y - Level::TILE_H * 0.15f;
+        snowball.setPosition({spawnX, spawnY});
+
+        velocityX = directionX * 4.5f;   // horizontal speed
+        velocityY = -3.0f;               // slight upward launch for arc
+
+        frameIndex = 0;
+        snowball.setTextureRect(projFrames[frameIndex]);
+        snowball.setOrigin({ projFrames[frameIndex].size.x / 2.f, projFrames[frameIndex].size.y / 2.f });
+
+        if (directionX > 0.f)
+            snowball.setScale({ -renderScale, renderScale });
+        else
+            snowball.setScale({ renderScale, renderScale });
+
+        active = true;
+        clock.restart();
+        animClock.restart();
+    }
+
+    void update(Tiles* tiles, int tileCount) {
+        if (!active) return;
+
+        // 1) Animate between blob -> burst frames while projectile is active.
+        if (animClock.getElapsedTime().asSeconds() > 0.06f) {
+            frameIndex++;
+            if (frameIndex > 1) frameIndex = 1;
+            snowball.setTextureRect(projFrames[frameIndex]);
+            snowball.setOrigin({ projFrames[frameIndex].size.x / 2.f, projFrames[frameIndex].size.y / 2.f });
+            animClock.restart();
+        }
+
+        // 2) Save previous-frame hitbox BEFORE moving.
+        //    We use this to check if snowball came from above a tile.
+        auto before = snowball.getGlobalBounds();
+        float insetX = before.size.x * 0.22f;
+        float insetY = before.size.y * 0.28f;
+        FloatRect prevHitbox({ before.position.x + insetX, before.position.y + insetY },
+                             { before.size.x - insetX * 2.f, before.size.y - insetY * 2.f });
+
+        // 3) Apply projectile motion.
+        velocityY += gravity;
+        snowball.move({velocityX, velocityY});
+
+        // 4) Check tile collision only when falling.
+        //    This prevents "head hit" while moving upward.
+        if (velocityY >= 0.f) {
+            auto sb = snowball.getGlobalBounds();
+            FloatRect hitbox({ sb.position.x + insetX, sb.position.y + insetY },
+                             { sb.size.x - insetX * 2.f, sb.size.y - insetY * 2.f });
+
+            for (int i = 0; i < tileCount; i++) {
+                FloatRect tile = tiles[i].boun();
+                if (hitbox.findIntersection(tile)) {
+                    float prevBottom = prevHitbox.position.y + prevHitbox.size.y;
+                    float tileTop = tile.position.y;
+
+                    // 5) Top-surface-only rule:
+                    //    Deactivate only if projectile was above tile top in previous frame.
+                    //    +4.f gives tolerance so tiny jitter doesn't count as roof hit.
+                    if (prevBottom <= tileTop + 4.f) {
+                        active = false;
+                        return;
+                    }
+                }
+            }
+        }
+
+        auto pos = snowball.getPosition();
+
+        // Screen wrap horizontally
+        if (pos.x > 800.f) snowball.setPosition({0.f, pos.y});
+        if (pos.x < 0.f)   snowball.setPosition({800.f, pos.y});
+
+        // Deactivate if off-screen or after short range
+        if (pos.y > 600.f || clock.getElapsedTime().asSeconds() > 0.6f) {
+            active = false;
+        }
+    }
+
+    void draw(RenderWindow& window) {
+        if (active) window.draw(snowball);
+    }
+
+    FloatRect getBounds() {
+        return snowball.getGlobalBounds();
+    }
+};
+
+
+
+//////////////////////////////// SNOWBALL end //////////////////////////////////////
+
 class Player : public Botom {
 protected:
     bool isJump;
@@ -174,7 +315,7 @@ public:
         velocityY += gravity;
         enemy->move({ 0.f, velocityY });
 
-        if (checkCollision(tiles, tileCount)) {
+        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
             enemy->move({ 0.f, -velocityY });
             velocityY = 0.f;
             onGround = true;
@@ -225,7 +366,7 @@ public:
         // W key just LAUNCHES the player upward
         if (key == Keyboard::Key::W) {
             if (onGround) {             // can't double jump
-                velocityY = jumpForce;  // -10.f — shoots upward
+                velocityY = jumpForce;  // -10.f  shoots upward
                 onGround = false;
                 isJump = true;
             }
@@ -249,6 +390,15 @@ public:
         //    }
         //}
     }
+    
+    float getDirectionX() {
+        return (enemy->getScale().x > 0.f) ? -1.f : 1.f; // +scale is A (left), -scale is D (right)
+    }
+    
+    sf::Vector2f getPosition() {
+        return enemy->getPosition();
+    }
+
     Sprite Draw() {
         return *enemy;
     }
@@ -258,7 +408,6 @@ public:
     ~Player() {
     }
 };
-
 
 /////////////////// LOADING LEVELS //////////////////////////////
 
@@ -336,6 +485,8 @@ int main()
     LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
 
     Player play;
+    const int MAX_SNOWBALLS = 24;
+    Snowball snowballs[MAX_SNOWBALLS];
     play.setPos(12, 5);
 
     window.setFramerateLimit(60);
@@ -351,6 +502,7 @@ int main()
             if (event->is<Event::Closed>())
                 window.close();
 
+            
             if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                 if (keyPressed->code == Keyboard::Key::N) {
                     levelNo++;
@@ -358,6 +510,15 @@ int main()
                         levelNo = 1;
                     LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
                     play.setPos(12, 5);
+                }
+                if (keyPressed->code == Keyboard::Key::J) {
+                    // Reuse first inactive snowball from fixed pool
+                    for (int i = 0; i < MAX_SNOWBALLS; i++) {
+                        if (!snowballs[i].active) {
+                            snowballs[i].spawn(play.getPosition().x, play.getPosition().y, play.getDirectionX());
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -381,6 +542,10 @@ int main()
         }
 
 
+        for (int i = 0; i < MAX_SNOWBALLS; i++) {
+            snowballs[i].update(tilt, count);
+        }
+
         play.applyGravity(tilt, count);
 
         window.clear(Color::Black);
@@ -388,7 +553,12 @@ int main()
         for (int i = 0; i < count; i++) {
             tilt[i].Draw(window);
         }
+        
+        for (int i = 0; i < MAX_SNOWBALLS; i++) {
+            snowballs[i].draw(window);
+        }
         window.draw(play.Draw());
+
         window.display();
     }
 
@@ -396,3 +566,5 @@ int main()
     tilt = nullptr;
     return 0;
 }
+
+Texture Snowball::sharedTexture;
