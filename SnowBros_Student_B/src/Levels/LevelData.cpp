@@ -1,5 +1,7 @@
 #include "LevelData.h"
 
+const float Level::TILE_W = 800.f / Level::COLS;
+const float Level::TILE_H = 600.f / Level::ROWS;
 
 static void CopyLevelData(Level& level, int data[Level::ROWS][Level::COLS])
 {

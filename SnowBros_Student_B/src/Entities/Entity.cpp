@@ -14,7 +14,8 @@ sf::Vector2f Entity::GetPosition() const
 void Entity::SetPosition(const sf::Vector2f& pos)
 {
     position = pos;
-    hitbox.position = position;
+    hitbox.position.x = position.x;
+    hitbox.position.y = position.y;
 }
 
 sf::FloatRect Entity::GetHitBox() const
