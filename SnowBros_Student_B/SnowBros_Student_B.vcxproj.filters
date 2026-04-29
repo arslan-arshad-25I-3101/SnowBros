@@ -36,9 +36,6 @@
     <ClCompile Include="src\Game.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Systems\AuthManager.cpp">
       <Filter>Systems</Filter>
     </ClCompile>
@@ -71,6 +68,15 @@
     </ClCompile>
     <ClCompile Include="src\Systems\EventBus.cpp">
       <Filter>Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Levels\LevelData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Maps\TileMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -133,6 +139,12 @@
     </ClInclude>
     <ClInclude Include="Gamakichi.h">
       <Filter>Header Files\Enemies</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Levels\LevelData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Maps\TileMap.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
