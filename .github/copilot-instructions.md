@@ -9,6 +9,7 @@
 - User has not studied `constexpr` yet and prefers using `const` instead.
 - User prefers faster, concise responses with minimal back-and-forth.
 - User wants learning-first help: explain each change, avoid silent autonomous edits, and include clear comments in code so they understand what is happening.
+- User prefers no planning for simple coding tasks; wants concise guidance that explains what to do, how to do it, and why before edits instead of silent edits.
 
 ## Project-Specific Rules
 - User requested scaffolding-only changes for enemy architecture tasks: create/move header and cpp files without implementing code.

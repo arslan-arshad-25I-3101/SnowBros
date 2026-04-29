@@ -139,12 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="src\Enemies\Botom.cpp" />
     <ClCompile Include="src\Levels\LevelData.cpp" />
     <ClCompile Include="src\Maps\TileMap.cpp" />
     <ClCompile Include="src\Systems\AuthManager.cpp" />
     <ClCompile Include="src\Systems\DatabaseManager.cpp" />
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="src\Systems\ScoreManager.cpp" />
     <ClCompile Include="src\Systems\EventBus.cpp" />
     <ClCompile Include="src\Enemies\Boss.cpp" />
