@@ -21,7 +21,7 @@ protected:
     int frames = 0;
     float frametime = 0.15f; // time between animation frames in seconds
     Sprite* enemy; 
-    FloatRect bounds;
+
     float velocityY = 0.f;      // current vertical speed
     float gravity = 0.5f;     // pulls player down each frame
     float jumpForce = -10.f;    // negative = upward in SFML
@@ -144,6 +144,7 @@ public:
         } else {
             // Animation done — truly dead now
             alive = false;
+            dying = false;
             enemy->setPosition({ -999.f, -999.f });
         }
     }
@@ -169,9 +170,6 @@ public:
         return frozenOverlay;
     }
 
-    void setPos(float i) { 
-        enemy->setPosition({ 350.f, 65.f + i * 45.f });
-    }
     void setPos(int row, int col) {
         enemy->setPosition({ col * Level::TILE_W + Level::TILE_W / 2.f,
                              row * Level::TILE_H + Level::TILE_H / 2.f });
@@ -199,6 +197,16 @@ public:
     }
     FloatRect boun() {
         return enemy->getGlobalBounds();
+    }
+
+    void reset() {
+        alive = true;
+        dying = false;
+        frozen = false;
+		rolling = false;
+        frozenIndex = 0;
+        velocityY = 0.f;
+        rollingVelocityX = 0.f;
     }
     ~Botom() {
         delete enemy;
@@ -352,15 +360,6 @@ void Draw(int n, Botom* other, RenderWindow& window) {
     }
 }
 
-void setPos(float x, float y, int n, Botom* other) {
-    for (int i = 0; i < n; i++) {
-        other[i].setPos(i);
-        if (i % 2 == 1)
-            other[i].setmv1(false);
-        else
-            other[i].setmv1(true);
-    }
-}
 
 //////////////////////////////// SNOWBALL CLASS //////////////////////////////////////
 
@@ -519,21 +518,8 @@ bool snowballHitsEnemy(Snowball& snowball, Botom& enemy) {
 
 class Player : public Botom {
 protected:
-    bool isJump;
     float playerScale = 1.f;
 
-    bool checkCollision(Tiles* tiles, int tileCount) {
-        auto bounds = enemy->getGlobalBounds();
-        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-                         { bounds.size.x - 12.f, bounds.size.y - 12.f });
-
-        for (int i = 0; i < tileCount; i++) {
-            if (hitbox.findIntersection(tiles[i].boun())) {
-                return true;
-            }
-        }
-        return false;
-    }
 
 public:
     Player() {
@@ -560,7 +546,7 @@ public:
             enemy->move({ 0.f, -velocityY });
             velocityY = 0.f;
             onGround = true;
-            isJump = false;
+
         }
         else {
             onGround = false;
@@ -609,7 +595,6 @@ public:
             if (onGround) {             // can't double jump
                 velocityY = jumpForce;  // -10.f  shoots upward
                 onGround = false;
-                isJump = true;
             }
         }
     }
@@ -624,9 +609,6 @@ public:
 
     Sprite Draw() {
         return *enemy;
-    }
-    void Setorigin(float x, float y) {
-
     }
     ~Player() {
     }
@@ -689,6 +671,39 @@ void LoadLevel(
 
 ///////////////////////////////////// LEVEL LOADING END ////////////////////////////////////
 
+struct EnemySpawnPoint { int row; int col; };
+
+EnemySpawnPoint levelSpawns[10][6] = {
+    // Level 1 — platforms at rows 4,5,7,9,11,13
+    { {3,4}, {3,11}, {6,2}, {6,13}, {8,3}, {10,7} },
+    // Level 2 — platforms at rows 3,5,7,9,11,13
+    { {2,5}, {2,11}, {4,7}, {6,5}, {8,7}, {10,5} },
+    // Level 3 — platforms at rows 0,3,5,7,9,11,13
+    { {2,6}, {2,10}, {4,5}, {4,11}, {6,5}, {10,4} },
+    // Level 4 — platforms at rows 0,3,5,7,9,11,13
+    { {2,7}, {4,7}, {6,4}, {6,10}, {8,4}, {10,5} },
+    // Level 5 — platforms at rows 0,3,5,7,9,11,13
+    { {2,5}, {2,11}, {4,8}, {6,7}, {8,7}, {10,7} },
+    // Level 6 — platforms at rows 0,3,4,7,9,11,13
+    { {2,5}, {2,10}, {3,7}, {6,6}, {10,5}, {10,10} },
+    // Level 7 — platforms at rows 0,3,4,5,7,8,9,10,11,13
+    { {2,3}, {2,12}, {4,8}, {6,5}, {8,4}, {10,2} },
+    // Level 8 — platforms at rows 0,4,5,7,9,11,13
+    { {3,7}, {4,8}, {6,4}, {6,11}, {8,4}, {10,6} },
+    // Level 9 — platforms at rows 0,3,5,7,9,11,13
+    { {2,6}, {2,10}, {4,5}, {6,4}, {8,5}, {10,4} },
+    // Level 10 — platforms at rows 0,5,7,8,9,11,13
+    { {4,3}, {4,10}, {6,4}, {8,4}, {10,4}, {10,10} }
+};
+
+void spawnEnemies(Botom* enemies, int levelNo) {
+    EnemySpawnPoint* spawns = levelSpawns[levelNo - 1];
+    for (int i = 0; i < 6; i++) {
+        enemies[i].setPos(spawns[i].row, spawns[i].col);
+        enemies[i].setmv1(rand() % 2 == 0);
+    }
+}
+
 int main()
 {
     RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
@@ -706,20 +721,7 @@ int main()
     const int MAX_ENEMIES = 6;
     Botom enemies[MAX_ENEMIES];
 
-    // Place enemies on valid platforms from Level 1:
-    //   Row 4 has tiles at cols 4-11  (enemies stand ON row 4 = placed at row 3)
-    //   Row 7 has tiles at cols 1-6 and 9-14
-    //   Row 9 has tiles at cols 3-12
-    //   Row 11 has tiles at cols 0-3, 6-9, 12-15
-    // setPos(row, col) uses row/col to calculate pixel position
-    // Place enemy one row ABOVE the platform so it lands on it
-    enemies[0].setPos(3, 5);   enemies[0].setmv1(true);
-    enemies[1].setPos(3, 9);   enemies[1].setmv1(false);
-    enemies[2].setPos(6, 3);   enemies[2].setmv1(true);
-    enemies[3].setPos(6, 11);  enemies[3].setmv1(false);
-    enemies[4].setPos(8, 5);   enemies[4].setmv1(true);
-    enemies[5].setPos(10, 8);  enemies[5].setmv1(false);
-
+    spawnEnemies(enemies, levelNo);
     const int MAX_SNOWBALLS = 24;
     Snowball snowballs[MAX_SNOWBALLS];
     play.setPos(12, 5);
@@ -737,6 +739,7 @@ int main()
             if (event->is<Event::Closed>())
                 window.close();
 
+            
             if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                 if (keyPressed->code == Keyboard::Key::N) {
                     levelNo++;
@@ -766,9 +769,6 @@ int main()
         if (Keyboard::isKeyPressed(Keyboard::Key::W)) {
             play.move(Keyboard::Key::W, tilt, count);
         }
-        if (Keyboard::isKeyPressed(Keyboard::Key::S)) {
-            play.move(Keyboard::Key::S, tilt, count);
-        }
 
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             snowballs[i].update(tilt, count);
@@ -787,6 +787,26 @@ int main()
             }
         }
 
+		/// are all enemies dead? if yes, next level
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (enemies[i].isAlive() || enemies[i].isDying()) {
+                break; // at least one enemy is still alive, don't load next level
+            }
+            else if(i == MAX_ENEMIES - 1) {
+				for (int j = 0; j < MAX_ENEMIES; j++) {
+                    enemies[j].reset();
+                }
+                levelNo++;
+                if (levelNo > 10)
+                    // need to implement winning screen etc here later
+                    levelNo = 1;
+                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                play.setPos(12, 5);
+                spawnEnemies(enemies, levelNo);
+            }
+        }
+
+        //
         // --- KICK DETECTION ---
         // If player overlaps a fully-frozen enemy, kick it in the player's direction
         for (int i = 0; i < MAX_ENEMIES; i++) {
