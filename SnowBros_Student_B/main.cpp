@@ -1259,6 +1259,8 @@ switch(choice){
   
             if (play.boun().findIntersection(enemies[i].boun())) {
                 enemies[i].kick(play.getDirectionX());
+                score += 100;
+				gems += 10;
             }
            
         }
@@ -1285,7 +1287,7 @@ switch(choice){
                 if (enemies[i].boun().findIntersection(enemies[j].boun())) {
                     enemies[j].kill();  // enemy in the path dies
                     score +=200;
-                    gem+=10;
+                    gems+=10;
                     // The rolling snowball keeps going to kill others in its path
                 }
             }
