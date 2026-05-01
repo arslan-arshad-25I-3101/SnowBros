@@ -36,8 +36,8 @@ cmake --build . --config Release
 ## Project Structure
 
 ```
-SnowBros/
-├── CMakeLists.txt                 # Build configuration
+SnowBros/          
+|
 ├── main.cpp                       # Entry point
 ├── README.md                      # Documentation
 ├── DESIGN_DOCUMENT.txt            # Architecture guide
