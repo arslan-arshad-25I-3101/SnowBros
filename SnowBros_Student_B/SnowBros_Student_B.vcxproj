@@ -154,6 +154,7 @@
     <ClCompile Include="src\Enemies\Gamakichi.cpp" />
     <ClCompile Include="src\Enemies\Mogera.cpp" />
     <ClCompile Include="src\Enemies\Tornado.cpp" />
+
     <ClCompile Include="src\Enemies\Enemy.cpp" />
     <ClCompile Include="src\Entities\Entity.cpp" />
     <ClCompile Include="src\Game.cpp" />

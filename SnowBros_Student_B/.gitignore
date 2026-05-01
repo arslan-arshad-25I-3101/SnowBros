@@ -57,6 +57,9 @@ Thumbs.db
 *.db
 *.sqlite
 local_data.txt
+<<<<<<< HEAD
+=======
 
 # Archives
 *.zip
+>>>>>>> 42a583218bfc7242b541039f3bf20500d1cbb197
