@@ -292,7 +292,7 @@ public:
     bool getAnti() {
         return anti;
     }
-    
+
     bool checkTileBelow(Tiles* tiles, int tileCount) {
         auto bounds = enemy->getGlobalBounds();
         // Check a bit below the enemy's feet
@@ -348,7 +348,7 @@ public:
 
             return; // skip normal walking logic
         }
-        if(frozen) return;
+        if (frozen) return;
 
         //functiosn related to botom movement start from here
         if (mv1 == true) {
@@ -449,138 +449,6 @@ public:
         delete enemy;
         enemy = nullptr;
     }
-};
-
-class Fooga : public Botom {
-    protected:
-    bool isFlying;
-    float velocity_X = 0.125f;
-    public:
-        Fooga() {
-            tex[0].loadFromFile("fooga/flying_01.png");
-            tex[1].loadFromFile("fooga/flying_02.png");
-            tex[2].loadFromFile("fooga/flying_03.png");
-            tex[3].loadFromFile("fooga/flying_01.png");
-            tex[4].loadFromFile("fooga/flying_01.png");
-            enemy = new Sprite(tex[0]);
-    }
-        void Axis_move() {
-        enemy->move({speed+velocity_X, speed+velocityY});
-    }
-        void Ariel_move() {
-            enemy->move({ speed - velocity_X, speed - velocityY });
-        }
-        void movement()  {
-            if (mv1 == true &&  (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
-                velocity_X -= 0.0625f;
-                velocityY = velocityY;
-                enemy->move({ -speed, -velocityY+speed});
-                enemy->setScale({ 177.f / 455.f,180.f / 455.f });
-                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                    (frames)++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-
-                }
-            }
-            else if (mv1 == false && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
-                velocity_X -= 0.0625f;
-                velocityY = velocityY;
-                enemy->move({ +speed, +velocityY });
-                enemy->setScale({ -177.f / 455.f,180.f / 455.f });
-                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                    (frames)++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
-            }
-            else if (enemy->getPosition().y < 25.f){
-                velocity_X += 0.0625f;
-                velocityY += 0.75f;
-                enemy->move({ speed, velocityY });
-                enemy->setScale({ -177.f / 455.f,180.f / 455.f });
-                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                    (frames)++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
-            }
-            
-            else {
-                velocity_X -= 0.0625f;
-                velocityY -= 0.5f;
-                enemy->move({ speed, velocityY });
-                enemy->setScale({ -177.f / 455.f,180.f / 455.f });
-                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                    (frames)++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
-            }
-            //int my_Num = rand()%2;
-
-            if (enemy->getPosition().x >= 725 && enemy->getPosition().x <= 800) {
-                mv1 = true;
-                enemy->setTexture(tex[3]);
-                pausef = 60;
-                velocity_X -= 0.0625f;
-                velocityY = -velocityY;
-                //if(my_Num == 0)
-                //Axis_move();
-                //else
-                //Ariel_move();
-
-            }
-            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
-                mv1 = false;
-                enemy->setTexture(tex[3]);
-                pausef = 60;
-                velocity_X += 0.0625f;
-                velocityY = -velocityY;
-                //if (my_Num == 0)
-                //    Axis_move();
-                //else
-                //    Ariel_move();
-            }
-            if (enemy->getPosition().y >= 0 && enemy->getPosition().y <= 15) {
-                mv1 = false;
-                enemy->setTexture(tex[1]);
-                pausef = 60;
-                velocity_X += 0.0625;
-                velocityY = velocityY;
-                //if (my_Num == 0)
-                //    Axis_move();
-                //else
-                //    Ariel_move();
-            }
-            if (enemy->getPosition().y >= 550 && enemy->getPosition().y <= 600) {
-                mv1 = false;
-                enemy->setTexture(tex[1]);
-                pausef = 60;
-                velocity_X -= 0.25f;
-                velocityY -= 0.5f;
-                //if (my_Num == 0)
-                //    Axis_move();
-                //else
-                //    Ariel_move();
-            }
-            if (enemy->getPosition().x <= 0 && enemy->getPosition().y <= 0) {
-                mv1 = false;
-                enemy->setTexture(tex[1]);
-                pausef = 60;
-                velocity_X += 0.0625;
-                velocityY = -velocityY;
-            }
-        }
-
 };
 
 class Fooga : public Botom {
@@ -701,7 +569,7 @@ public:
             pausef = 60;
             velocity_X -= 0.0625f;
             velocityY = -velocityY;
-            
+
 
         }
         if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
@@ -733,7 +601,7 @@ public:
             velocityY = -velocityY;
         }
     }
-   
+
 
 };
 
@@ -750,16 +618,6 @@ void Draw(int n, Botom* other, RenderWindow& window) {
         if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
         window.draw(other[i].getEnemy());
     }
-}
-
-void mover(int n, Fooga* other) {
-    for(int i = 0; i < n; i++)
-    other[i].movement();
-}
-
-void Draw(int n, Fooga* other, RenderWindow& window) {
-for(int i = 0; i < n; i++)
-window.draw(other[i].getEnemy());
 }
 
 void mover(int n, Fooga* other, Tiles* tiles, int tileCount) {
@@ -902,7 +760,7 @@ public:
         float insetX = before.size.x * 0.22f;
         float insetY = before.size.y * 0.28f;
         FloatRect prevHitbox({ before.position.x + insetX, before.position.y + insetY },
-                             { before.size.x - insetX * 2.f, before.size.y - insetY * 2.f });
+            { before.size.x - insetX * 2.f, before.size.y - insetY * 2.f });
 
         // Projectile motion
         velocityY += gravity;
@@ -913,7 +771,7 @@ public:
         if (velocityY >= 0.f) {
             auto sb = snowball.getGlobalBounds();
             FloatRect hitbox({ sb.position.x + insetX, sb.position.y + insetY },
-                             { sb.size.x - insetX * 2.f, sb.size.y - insetY * 2.f });
+                { sb.size.x - insetX * 2.f, sb.size.y - insetY * 2.f });
 
             for (int i = 0; i < tileCount; i++) {
                 FloatRect tile = tiles[i].boun();
@@ -1033,7 +891,8 @@ public:
             enemy->move({ -2.25f, -0.0f });
             if (checkCollision(tiles, tileCount)) {
                 enemy->move({ 2.25f, -0.0f }); // undo movement
-            } else {
+            }
+            else {
                 enemy->setScale({ playerScale, playerScale });
                 if (clocks.getElapsedTime().asSeconds() > frametime) {
                     frames++;
@@ -1048,7 +907,8 @@ public:
             enemy->move({ +2.25f, -0.0f });
             if (checkCollision(tiles, tileCount)) {
                 enemy->move({ -2.25f, -0.0f }); // undo movement
-            } else {
+            }
+            else {
                 enemy->setScale({ -playerScale, playerScale });
                 if (clocks.getElapsedTime().asSeconds() > frametime) {
                     frames++;
@@ -1195,7 +1055,7 @@ int main()
     Player play;
     const int MAX_ENEMIES = 6;
     Botom enemies[MAX_ENEMIES];
-  
+
     spawnEnemies(enemies, levelNo);
     const int MAX_SNOWBALLS = 24;
     Snowball snowballs[MAX_SNOWBALLS];
@@ -1236,7 +1096,7 @@ int main()
             if (event->is<Event::Closed>())
                 window.close();
 
-            
+
             if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                 if (keyPressed->code == Keyboard::Key::N) {
                     levelNo++;
@@ -1296,13 +1156,13 @@ int main()
                 }
             }
         }
-		/// are all enemies dead? if yes, next level
+        /// are all enemies dead? if yes, next level
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (enemies[i].isAlive() || enemies[i].isDying()) {
                 break; // at least one enemy is still alive, don't load next level
             }
-            else if(i == MAX_ENEMIES - 1) {
-				for (int j = 0; j < MAX_ENEMIES; j++) {
+            else if (i == MAX_ENEMIES - 1) {
+                for (int j = 0; j < MAX_ENEMIES; j++) {
                     enemies[j].reset();
                 }
                 levelNo++;
@@ -1340,11 +1200,11 @@ int main()
             if (!enemies[i].isAlive()) continue;
             if (!enemies[i].isFullyFrozen()) continue;
             if (enemies[i].isRolling()) continue;  // already rolling
-  
+
             if (play.boun().findIntersection(enemies[i].boun())) {
                 enemies[i].kick(play.getDirectionX());
             }
-           
+
         }
         //fooga idk
         for (int i = 0; i < 4; i++) {
@@ -1403,15 +1263,14 @@ int main()
 
         //foogas
         for (int i = 0; i < 4; i++) {
-            if(!fooga[i].isAlive()) continue;
+            if (!fooga[i].isAlive()) continue;
             fooga[i].updateFrozen();
         }
         for (int i = 0; i < 4; i++) {
             fooga[i].updateDying();
         }
         play.applyGravity(tilt, count);
-        Gravity(opt, botom, tilt, count);
-        //Gravity(num, fooga, tilt, count);
+
         window.clear(Color::Black);
         window.draw(background);
         for (int i = 0; i < count; i++) {
@@ -1439,8 +1298,6 @@ int main()
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             snowballs[i].draw(window);
         }
-        mover(opt, botom);
-        mover(num, fooga);
         window.draw(play.Draw());
 
         window.display();
@@ -1455,4 +1312,3 @@ int main()
 
 Texture Snowball::sharedTexture;
 Texture Botom::frozenSharedTexture;
-
