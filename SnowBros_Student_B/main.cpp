@@ -1,6 +1,7 @@
 #include "src/Game.h"
 #include <cstdlib>
 #include <ctime>
+#include<cmath>
 // Quick-fix includes for testing in main.cpp
 #include <SFML/Graphics.hpp>
 #include <iostream>
@@ -9,10 +10,47 @@
 using namespace std;
 using namespace sf;
 
-class Botom {
+class Tiles {
+private:
+    RectangleShape tile;
+    FloatRect bounds;
+
+public:
+    Tiles() {
+        tile.setSize({ Level::TILE_W, Level::TILE_H });
+        //tile.setFillColor(Color(255, 0, 0, 191));
+        //tile.setOutlineThickness(0.f);
+    }
+
+    void setpost(float x, float y) {
+        tile.setPosition({ x, y });
+    }
+
+    void Draw(RenderWindow& window) {
+        window.draw(tile);
+    }
+    float getX() {
+        return tile.getPosition().x;
+    }
+    float getY() {
+        return tile.getPosition().y;
+    }
+    FloatRect boun() {
+        return tile.getGlobalBounds();
+    }
+};
+
+class Generic {
+    public:
+    Generic() = default;
+      virtual void movement() = 0;
+      virtual ~Generic() = default;
+};
+
+class Botom{
 protected:
     bool mv1 = false;
-    Texture tex[4];
+    Texture tex[6];
     Clock clocks;
     int frames = 0;
     float frametime = 0.15f;
@@ -22,18 +60,205 @@ protected:
     float gravity = 0.5f;     // pulls player down each frame
     float jumpForce = -10.f;    // negative = upward in SFML
     bool onGround = false;    // can only jump if standing on something
+    int pausef = 0;
+    bool isJump;
+    float playerScale = 1.f;
+    float speed = 2.25f;
+    bool onUpper;
+    bool anti;
+
+    bool checkCollision(Tiles* tiles, int tileCount) {
+        auto bounds = enemy->getGlobalBounds();
+        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
+            { bounds.size.x - 12.f, bounds.size.y - 12.f });
+
+        for (int i = 0; i < tileCount; i++) {
+            if (hitbox.findIntersection(tiles[i].boun())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool upCheckCollision(Tiles* tiles, int tileCount) {
+        auto bounds = enemy->getGlobalBounds();
+        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
+            { bounds.size.x - 12.f, bounds.size.y - 12.f });
+
+        for (int i = 0; i < tileCount; i++) {
+            if (hitbox.findIntersection(tiles[i].boun())) {
+                return true;
+            }
+        }
+        return false;
+    }
+  
 public:
     Botom() {
         tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
         tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
         tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
         tex[3].loadFromFile("botom_orange/Botom_bruh.png");
+        tex[4].loadFromFile("botom_orange/Botom_orange_fall.png");
+        tex[5].loadFromFile("botom_orange/botom_jump.png");
         enemy = new Sprite(tex[0]);
+        enemy->setOrigin({97.f/2.f,89.f/2.f});
     }
-    void movement() {
+    float distanceChecker(Tiles* tiles, int tileCount) {
+    auto bounds = enemy->getGlobalBounds();
+    FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
+        { bounds.size.x - 12.f, bounds.size.y - 12.f });
+    //for (int i = 0; i < tileCount;i++) {
+    //    //if (hitbox.findIntersection(tiles[i].boun())) {
+    //    //    double distance = hypot(tiles[i+1].getX()-tiles[i].getX(),tiles[i+1].getY()-tiles[i].getY());
+    //    //    return distance;
+    //    //}
+    //    for (int j = 1; j < tileCount; j++) {
+    //        //if (tiles[i].getX() == tiles[j].getX()) {
+    //            if (hitbox.findIntersection(tiles[i].boun())) {
+    //                double distance = hypot(tiles[j].getX() - tiles[i].getX(), tiles[j].getY() - tiles[i].getY());
+    //                return distance;
+    //            }
+    //        //}
+    //  }
+    //    }
+    //    return 0.f;
+    for (int i = 0; i < tileCount; i++) {
+        if (hitbox.findIntersection(tiles[i].boun())) {
+            for (int j = 0; j < tileCount; j++) {
+                if (tiles[i].getX() == tiles[j].getX() && tiles[j].getY() < tiles[i].getY()) {
+                    double distance = hypot(tiles[j].getX() - enemy->getPosition().x,
+                        tiles[j].getY() - enemy->getPosition().y);
+                    return distance;
+                }
+            }
+        }
+    }
+    return 0.f;
+    }
+    enum GravityState { NORMAL, JUMPING_UP };
+    GravityState currentState = NORMAL;
+    void applyGravity(Tiles* tiles, int tileCount) {
+        velocityY += gravity;
+        float limit = enemy->getPosition().y + velocityY;
+        if (limit < 15.f) {
+        velocityY = 15.f - enemy->getPosition().y;
+        }
+        enemy->move({ 0.f, velocityY });
+
+        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
+            enemy->move({ 0.f, -velocityY });
+            velocityY = 0.f;
+            onGround = true;
+            isJump = false;
+        }
+        else {
+            onGround = false;
+            if (velocityY < 0)
+                enemy->setTexture(tex[4]);
+            else
+                enemy->setTexture(tex[4]);
+        }
+    }
+    void antiGravity(Tiles* tiles, int tileCount) {
+        if (currentState == NORMAL && upCheckCollision(tiles, tileCount)) {
+            // Start the jump
+            float distance = distanceChecker(tiles, tileCount);
+            velocityY = -5.0f;  // Initial jump speed
+            currentState = JUMPING_UP;
+        }
+
+        if (currentState == JUMPING_UP) {
+            velocityY += gravity * 0.5f;  // Slower gravity while jumping up
+            enemy->move({ 0.f, velocityY });
+
+            // Check if reached upper tile
+            if (upCheckCollision(tiles, tileCount) && velocityY >= 0) {
+                enemy->move({ 0.0f, -velocityY });
+                velocityY = 0.0f;
+                currentState = NORMAL;  // Reset
+                onUpper = true;
+            }
+        }
+    }
+    //void antiGravity(Tiles* tiles, int tileCount) {
+    //    // Calculate target distance once when collision detected
+    //    if (velocityY >= 0.f && upCheckCollision(tiles, tileCount)) {
+    //        float distance = distanceChecker(tiles, tileCount);
+    //        // Give a jump boost based on distance
+    //        velocityY = -distance * 0.15f;  // Adjust multiplier for jump speed
+    //    }
+
+    //    // Apply upward movement
+    //    velocityY += gravity;  // Gravity pulls back down naturally
+    //    enemy->move({ 0.f, velocityY });
+
+    //    // Check if landed on upper tile
+    //    if (velocityY <= 0.f && upCheckCollision(tiles, tileCount)) {
+    //        enemy->move({ 0.0f, -velocityY });
+    //        velocityY = 0.0f;
+    //        onUpper = true;
+    //    }
+    //    else {
+    //        onUpper = false;
+    //        enemy->setTexture(tex[5]);
+    //    }
+    //}
+    //void antiGravity(Tiles* tiles, int tileCount) {
+   
+    //velocityY -= gravity;
+    //enemy->move({0.f, velocityY});
+    ////enemy->move({0.f,-10.f});
+   
+    //if (velocityY < 0.f && upCheckCollision(tiles, tileCount)) {
+    //   // enemy->move({0.0f, -velocityY-2.f});
+    //   //float temp = -0.5f;
+    //   float dist = distanceChecker(tiles,tileCount);
+    //   enemy->move({ 0.0f,-velocityY });
+    //   if (dist > 5.f) {
+    //       anti = true;
+    //       enemy->move({0.0f,-speed});
+    //       
+    //   }
+    //   //while(temp >= -distanceChecker(tiles,tileCount)){
+    //   //enemy->move({0.0f, temp});
+    //   //temp -= 0.001f;
+    //   //}
+    //   else{
+    //    velocityY = 0.0f;
+    //    onUpper = true;
+    //    isJump = false;
+    //    anti = false;
+    //    }
+    //}
+    //else {
+    //    onUpper = false;
+    //    if(velocityY > 0)
+    //    enemy->setTexture(tex[5]);
+    //    else
+    //    enemy->setTexture(tex[5]);
+    //}
+    //}
+    bool getAnti() {
+        return anti;
+    }
+    //Below is from claude
+    bool checkTileBelow(Tiles* tiles, int tileCount) {
+        auto bounds = enemy->getGlobalBounds();
+        // Check a bit below the enemy's feet
+        FloatRect checkArea({ bounds.position.x + 6.f, bounds.position.y + bounds.size.y },
+            { bounds.size.x - 12.f, 2.f }); // 5 pixels below
+
+        for (int i = 0; i < tileCount; i++) {
+            if (checkArea.findIntersection(tiles[i].boun())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    void movement()  {
         if (mv1 == true) {
-            enemy->move({ -2.25f, -0.0f });
-            enemy->setScale({ 1.f,1.f });
+            enemy->move({ -speed, -0.0f });
+            enemy->setScale({ 89.f/185.f,97.f/185.f });
             if ((clocks.getElapsedTime().asSeconds()) > frametime) {
                 (frames)++;
                 if (frames >= 3)
@@ -44,8 +269,8 @@ public:
                 }
             }
             else if (mv1 == false) {
-                enemy->move({ +2.25f, -0.0f });
-                enemy->setScale({ -97.f/121.f,89.f/121.f });
+                enemy->move({ +speed, -0.0f });
+                enemy->setScale({ -89.f / 185.f,97.f / 185.f });
                 if ((clocks.getElapsedTime().asSeconds()) > frametime) {
                     (frames)++;
                     if (frames >= 3)
@@ -66,10 +291,8 @@ public:
                 enemy->setTexture(tex[3]);
                 pausef = 60;
             }
+
         }
-
-
-    }
     Sprite getEnemy() {
         return *enemy;
     }
@@ -79,6 +302,10 @@ public:
     void setPos(int row, int col) {
         enemy->setPosition({ col * Level::TILE_W + Level::TILE_W / 2.f,
                              row * Level::TILE_H + Level::TILE_H / 2.f });
+    }
+    void setPos(float x, float y, float xx, float yy) {
+        enemy->setOrigin({xx,yy});
+        enemy->setPosition({x,y});
     }
     void setOrigin(float x, float y) {
         enemy->setOrigin({ x,y });
@@ -101,6 +328,138 @@ public:
     }
 };
 
+class Fooga : public Botom {
+    protected:
+    bool isFlying;
+    float velocity_X = 0.125f;
+    public:
+        Fooga() {
+            tex[0].loadFromFile("fooga/flying_01.png");
+            tex[1].loadFromFile("fooga/flying_02.png");
+            tex[2].loadFromFile("fooga/flying_03.png");
+            tex[3].loadFromFile("fooga/flying_01.png");
+            tex[4].loadFromFile("fooga/flying_01.png");
+            enemy = new Sprite(tex[0]);
+    }
+        void Axis_move() {
+        enemy->move({speed+velocity_X, speed+velocityY});
+    }
+        void Ariel_move() {
+            enemy->move({ speed - velocity_X, speed - velocityY });
+        }
+        void movement()  {
+            if (mv1 == true &&  (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
+                velocity_X -= 0.0625f;
+                velocityY = velocityY;
+                enemy->move({ -speed, -velocityY+speed});
+                enemy->setScale({ 177.f / 455.f,180.f / 455.f });
+                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                    (frames)++;
+                    if (frames >= 3)
+                        frames = 0;
+                    enemy->setTexture(tex[frames]);
+                    clocks.restart();
+
+                }
+            }
+            else if (mv1 == false && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
+                velocity_X -= 0.0625f;
+                velocityY = velocityY;
+                enemy->move({ +speed, +velocityY });
+                enemy->setScale({ -177.f / 455.f,180.f / 455.f });
+                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                    (frames)++;
+                    if (frames >= 3)
+                        frames = 0;
+                    enemy->setTexture(tex[frames]);
+                    clocks.restart();
+                }
+            }
+            else if (enemy->getPosition().y < 25.f){
+                velocity_X += 0.0625f;
+                velocityY += 0.75f;
+                enemy->move({ speed, velocityY });
+                enemy->setScale({ -177.f / 455.f,180.f / 455.f });
+                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                    (frames)++;
+                    if (frames >= 3)
+                        frames = 0;
+                    enemy->setTexture(tex[frames]);
+                    clocks.restart();
+                }
+            }
+            
+            else {
+                velocity_X -= 0.0625f;
+                velocityY -= 0.5f;
+                enemy->move({ speed, velocityY });
+                enemy->setScale({ -177.f / 455.f,180.f / 455.f });
+                if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                    (frames)++;
+                    if (frames >= 3)
+                        frames = 0;
+                    enemy->setTexture(tex[frames]);
+                    clocks.restart();
+                }
+            }
+            //int my_Num = rand()%2;
+
+            if (enemy->getPosition().x >= 725 && enemy->getPosition().x <= 800) {
+                mv1 = true;
+                enemy->setTexture(tex[3]);
+                pausef = 60;
+                velocity_X -= 0.0625f;
+                velocityY = -velocityY;
+                //if(my_Num == 0)
+                //Axis_move();
+                //else
+                //Ariel_move();
+
+            }
+            if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
+                mv1 = false;
+                enemy->setTexture(tex[3]);
+                pausef = 60;
+                velocity_X += 0.0625f;
+                velocityY = -velocityY;
+                //if (my_Num == 0)
+                //    Axis_move();
+                //else
+                //    Ariel_move();
+            }
+            if (enemy->getPosition().y >= 0 && enemy->getPosition().y <= 15) {
+                mv1 = false;
+                enemy->setTexture(tex[1]);
+                pausef = 60;
+                velocity_X += 0.0625;
+                velocityY = velocityY;
+                //if (my_Num == 0)
+                //    Axis_move();
+                //else
+                //    Ariel_move();
+            }
+            if (enemy->getPosition().y >= 550 && enemy->getPosition().y <= 600) {
+                mv1 = false;
+                enemy->setTexture(tex[1]);
+                pausef = 60;
+                velocity_X -= 0.25f;
+                velocityY -= 0.5f;
+                //if (my_Num == 0)
+                //    Axis_move();
+                //else
+                //    Ariel_move();
+            }
+            if (enemy->getPosition().x <= 0 && enemy->getPosition().y <= 0) {
+                mv1 = false;
+                enemy->setTexture(tex[1]);
+                pausef = 60;
+                velocity_X += 0.0625;
+                velocityY = -velocityY;
+            }
+        }
+
+};
+
 void mover(int n, Botom* other) {
     for (int i = 0; i < n; i++) {
         other[i].movement();
@@ -111,6 +470,16 @@ void Draw(int n, Botom* other, RenderWindow& window) {
     for (int i = 0; i < n; i++) {
         window.draw(other[i].getEnemy());
     }
+}
+
+void mover(int n, Fooga* other) {
+    for(int i = 0; i < n; i++)
+    other[i].movement();
+}
+
+void Draw(int n, Fooga* other, RenderWindow& window) {
+for(int i = 0; i < n; i++)
+window.draw(other[i].getEnemy());
 }
 
 void setPos(float x, float y, int n, Botom* other) {
@@ -124,31 +493,46 @@ void setPos(float x, float y, int n, Botom* other) {
     }
 }
 
-class Tiles {
-private:
-    RectangleShape tile;
-    FloatRect bounds;
-
-public:
-    Tiles() {
-        tile.setSize({ Level::TILE_W, Level::TILE_H });
-        //tile.setFillColor(Color(255, 0, 0, 191));
-        //tile.setOutlineThickness(0.f);
+void setPos(float x, float y, int n, Fooga* other) {
+    for (int i = 0; i < n; i++) {
+        other[i].setOrigin(x, y);
+        other[i].setPos(i);
+        if (i % 2 == 1)
+            other[i].setmv1(false);
+        else
+            other[i].setmv1(true);
     }
+}
 
-    void setpost(float x, float y) {
-        tile.setPosition({ x, y });
+void Gravity(int n, Botom* other, Tiles* tiles, int c) {
+    for(int i = 0; i < n; i++){
+        if (other[i].currentState == Botom::JUMPING_UP) {
+            other[i].antiGravity(tiles, c);
+        }
+        else{
+    bool isTile = other[i].checkTileBelow(tiles, c);
+    if (!isTile) {
+        other[i].applyGravity(tiles,c);
     }
-
-    void Draw(RenderWindow& window) {
-        window.draw(tile);
+    else{
+    int x = rand()%50;
+    if (x == 1)
+        other[i].antiGravity(tiles, c);
+    else if(x == 2)
+    other[i].applyGravity(tiles,c);
+    
+   }
+   }
     }
+}
 
-    FloatRect boun() {
-        return tile.getGlobalBounds();
-    }
-};
-
+void Gravity(int n, Fooga* other, Tiles* tiles, int c) {
+    for (int i = 0; i < n; i++) {
+        int x = rand() % 3;
+        if (x == 1)
+            other[i].applyGravity(tiles,c);
+            }
+}
 
 //////////////////////////////// SNOWBALL CLASS //////////////////////////////////////
 
@@ -287,21 +671,7 @@ public:
 
 class Player : public Botom {
 protected:
-    bool isJump;
-    float playerScale = 1.f;
-
-    bool checkCollision(Tiles* tiles, int tileCount) {
-        auto bounds = enemy->getGlobalBounds();
-        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-                         { bounds.size.x - 12.f, bounds.size.y - 12.f });
-
-        for (int i = 0; i < tileCount; i++) {
-            if (hitbox.findIntersection(tiles[i].boun())) {
-                return true;
-            }
-        }
-        return false;
-    }
+  
 
 public:
     Player() {
@@ -320,24 +690,7 @@ public:
     }
 
 
-    void applyGravity(Tiles* tiles, int tileCount) {
-        velocityY += gravity;
-        enemy->move({ 0.f, velocityY });
-
-        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-            enemy->move({ 0.f, -velocityY });
-            velocityY = 0.f;
-            onGround = true;
-            isJump = false;
-        }
-        else {
-            onGround = false;
-            if (velocityY < 0)
-                enemy->setTexture(tex[1]);
-            else
-                enemy->setTexture(tex[2]);
-        }
-    }
+ 
 
     void move(Keyboard::Key key, Tiles* tiles, int tileCount) {
 
@@ -482,6 +835,7 @@ void LoadLevel(
 
 int main()
 {
+srand(time(NULL));
     cout << "How many botoms do you want to create? ";
     int opt;
     cin >> opt;
@@ -511,9 +865,22 @@ int main()
     botom[2].setPos(155.f, 275.f, x, y);
     botom[3].setPos(555.f, 275.f, x, y);
     botom[4].setPos(400.f, 365.f, x, y);
-    for(int i = 0; i < opt; i++)
-    botom[i].setScale(151.f, 151.f);
 
+    //------------ For the birds ------------
+    int num = 4;
+    Fooga* fooga = new Fooga[num];
+    float fx = 177.f/2.f;
+    float fy = 180.f/2.f;
+    fooga[0].setPos(155.f, 125.f, x, y);
+    fooga[1].setPos(355.f, 125.f, x, y);
+    fooga[2].setPos(155.f, 275.f, x, y);
+    fooga[3].setPos(555.f, 275.f, x, y);
+    //for (int i = 0; i < num; i++) {
+    //    int w = rand()%350+125;
+    //    int z = rand()%250+150;
+    //    fooga[i].setOrigin(fx, fy);
+    //    fooga[i].setPos(w,z);
+    //}
 
     window.setFramerateLimit(60);
 
@@ -573,7 +940,8 @@ int main()
         }
 
         play.applyGravity(tilt, count);
-
+        Gravity(opt, botom, tilt, count);
+        //Gravity(num, fooga, tilt, count);
         window.clear(Color::Black);
         window.draw(background);
         for (int i = 0; i < count; i++) {
@@ -583,25 +951,21 @@ int main()
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             snowballs[i].draw(window);
         }
+        mover(opt, botom);
+        mover(num, fooga);
         window.draw(play.Draw());
-
+        Draw(opt, botom, window);
+        Draw(num, fooga, window);
         window.display();
-        for (int i = 0; i < count; i++) {
-            for (int j = 0; j < opt; j++) {
-                if (tilt[i].boun().findIntersection(botom[j].boun())) {
-                    if (botom[j].getmv1() == false)
-                        botom[j].setmv1(true);
-                    else if (botom[j].getmv1() == true)
-                        botom[j].setmv1(false);
-                }
-            }
-        }
+      
     }
 
     delete[] tilt;
     delete[] botom;
+    delete[] fooga;
     tilt = nullptr;
     botom = nullptr;
+    fooga = nullptr;
     return 0;
 }
 
