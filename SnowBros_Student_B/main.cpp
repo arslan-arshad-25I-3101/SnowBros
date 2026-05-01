@@ -4,6 +4,8 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include "src/Levels/LevelData.h"
+#include "src/Systems/DatabaseManager.h"
+
 
 using namespace std;
 using namespace sf;
@@ -267,6 +269,8 @@ void Botom::movement(Tiles* tiles, int tileCount) {
         // Timeout: after 3 seconds of rolling, the snowball breaks
         if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
             kill();
+            score+=100;
+            gem+=10;
             return;
         }
 
@@ -704,16 +708,52 @@ void spawnEnemies(Botom* enemies, int levelNo) {
     }
 }
 
+GameState currentState = GameState::MainMenu;
+
 int main()
 {
+string username, password;
+
+cout<<"Do you want to login or register? (1 for login, 2 for register)" <<endl;
+int choice;
+cin>>choice;
+
+cout<<"Enter your username: " <<endl;
+cin>>username;
+cout<<"Enter your password: " <<endl;
+cin>>password;
+
+    DatabaseManager db;
+    int lives = 2, gems = 0, score = 0, count = 0;
+    int levelNo = 1;
+switch(choice){
+    case 1:
+        if(db.verifyLogin(username, password)){
+            db.LoadUser(username, levelNo, lives, gems, score);
+        }
+        else {
+            cout<<"You username or password is incorrect or you are not registered.\n";
+            return 0;
+        }
+    break;
+    
+    case 2:
+        db.registerUser(username, password);
+    break;
+    
+    default:
+        cout<<"Invalid choice. Please try again." <<endl;
+    break;
+}
+    
+    
     RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
 
     Level currentLevel;
     Texture bgTex;
     Sprite background(bgTex);
     Tiles* tilt = nullptr;
-    int count = 0;
-    int levelNo = 1;
+    
 
     LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
 
@@ -730,6 +770,9 @@ int main()
 
     while (window.isOpen())
     {
+        switch (currentState) {
+            case GameState::MainMenu:
+            {
         while (true)
         {
             auto event = window.pollEvent();
@@ -738,7 +781,29 @@ int main()
 
             if (event->is<Event::Closed>())
                 window.close();
+                }
 
+                if (Keyboard::isKeyPressed(Keyboard::Key::Enter)) {
+                    currentState = GameState::Playing;
+                }
+
+                window.clear(Color::Black);
+                // For now, we'll just show a black screen. 
+                // Once you have a font, we'll draw "Press Enter to Start"
+                window.display();
+            }
+            break;
+
+            case GameState::Playing:
+            {
+                while (true)
+                {
+                    auto event = window.pollEvent();
+                    if (!event.has_value())
+                        break;
+
+                    if (event->is<Event::Closed>())
+                        window.close();
             
             if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                 if (keyPressed->code == Keyboard::Key::N) {
@@ -832,8 +897,22 @@ int main()
 
                 if (enemies[i].boun().findIntersection(enemies[j].boun())) {
                     enemies[j].kill();  // enemy in the path dies
+                    score +=200;
+                    gem+=10;
                     // The rolling snowball keeps going to kill others in its path
                 }
+            }
+        }
+
+        // --- PLAYER DEATH DETECTION ---
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            // Only living, un-frozen enemies can kill the player
+            if (!enemies[i].isAlive() || enemies[i].isFrozen() || enemies[i].isDying()) continue;
+
+            if (play.boun().findIntersection(enemies[i].boun())) {
+                db.saveProgress(username,levelNo,lives-1,gems,score);
+                currentState = GameState::GameOver;
+                break;
             }
         }
 
@@ -876,6 +955,36 @@ int main()
         window.draw(play.Draw());
 
         window.display();
+            }
+            break;
+
+            case GameState::GameOver:
+            {
+                while (true)
+                {
+                    auto event = window.pollEvent();
+                    if (!event.has_value())
+                        break;
+
+                    if (event->is<Event::Closed>())
+                        window.close();
+                }
+
+                if (Keyboard::isKeyPressed(Keyboard::Key::Enter)) {
+                    // Restart logic
+                    levelNo = 1;
+                    LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                    play.setPos(12, 5);
+                    for (int i = 0; i < MAX_ENEMIES; i++) enemies[i].reset();
+                    spawnEnemies(enemies, levelNo);
+                    currentState = GameState::Playing;
+                }
+
+                window.clear(Color::Red); // Show red for Game Over
+                window.display();
+            }
+            break;
+        }
     }
 
     delete[] tilt;
