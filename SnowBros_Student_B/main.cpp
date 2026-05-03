@@ -1,14 +1,13 @@
-#include "src/Game.h"
-#include <cstdlib>
-#include <ctime>
-#include<cmath>
-#include <SFML/Graphics.hpp>
-#include <iostream>
-#include <fstream>
-#include "src/Levels/LevelData.h"
+#include "src/Levels/Tiles.h"
+#include "src/Entities/Player.h"
+#include "src/Entities/Enemies/Botom.h"
+#include "src/Entities/Enemies/Fooga.h"
+#include "src/Entities/Enemies/Tornado.h"
+#include "src/Entities/Enemies/Mogera.h"
+#include "src/Entities/Projectiles/Snowball.h"
 #include "src/Systems/DatabaseManager.h"
 #include "src/Systems/ShopManager.h"
-
+#include <fstream>
 
 using namespace std;
 using namespace sf;
@@ -21,1465 +20,46 @@ bool hasSnowballPower = false;
 bool hasDistanceIncrease = false;
 bool hasBalloonMode = false;
 
-// Forward declaration for Tiles
-//class Tiles;
-
-class Tiles {
-private:
-    RectangleShape tile;
-    FloatRect bounds;
-
-public:
-    Tiles() {
-        tile.setSize({ Level::TILE_W, Level::TILE_H });
-        tile.setFillColor(Color::Transparent);
-        //tile.setFillColor(Color(255, 0, 0, 191));
-        //tile.setOutlineThickness(0.f);
-    }
-
-    void setpost(float x, float y) {
-        tile.setPosition({ x, y });
-    }
-
-    void Draw(RenderWindow& window) {
-        window.draw(tile);
-    }
-    float getX() {
-        return tile.getPosition().x;
-    }
-    float getY() {
-        return tile.getPosition().y;
-    }
-    FloatRect boun() {
-        return tile.getGlobalBounds();
-    }
-};
-
-class Botom {
-protected:
-    bool mv1 = false;
-    Texture tex[6];
-    Texture spriteSheet;
-    IntRect walkFrames[3];
-    Clock clocks;
-    int frames = 0;
-    float frametime = 0.15f;
-    Sprite* enemy;
-    FloatRect bounds;
-    float velocityY = 0.f;      // current vertical speed
-    float gravity = 0.5f;     // pulls player down each frame
-    float jumpForce = -10.f;    // negative = upward in SFML
-    bool onGround = false;    // can only jump if standing on something
-    int pausef = 0;
-    bool isJump;
-    float playerScale = 1.f;
-    float speed = 2.25f;
-    bool onUpper;
-    bool anti;
-    bool frozen = false;    // whether encased in snowball
-    Clock freezeClock;       // timer for snowball encasement
-    IntRect frozenFrames[4]; // 4 stages of ice overlay
-    int frozenIndex = 0;    // current frame (0-3)
-    Sprite frozenOverlay;   // overlay sprite drawn on top of enemy
-    static Texture frozenSharedTexture;  // ONE shared texture for all enemies
-    float enemyScale = 1.f;  // scale for rendering
-
-    // Rolling state — after player kicks a fully-frozen enemy
-    bool rolling = false;
-    float rollingVelocityX = 0.f;
-    Clock rollingClock;          // rolling timeout — dies after a few seconds
-
-    // Death state
-    bool alive = true;           // dead enemies are skipped entirely
-    bool dying = false;          // brief shrink animation before truly dead
-    Clock dyingClock;            // timer for death animation
-
-    //for checking gravity like falling
-    bool checkCollision(Tiles* tiles, int tileCount) {
-        auto bounds = enemy->getGlobalBounds();
-        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-            { bounds.size.x - 12.f, bounds.size.y - 12.f });
-
-        for (int i = 0; i < tileCount; i++) {
-            if (hitbox.findIntersection(tiles[i].boun())) {
-                return true;
-            }
-        }
-        return false;
-    }
-    //for checking gravity like jumping
-    bool upCheckCollision(Tiles* tiles, int tileCount) {
-        auto bounds = enemy->getGlobalBounds();
-        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-            { bounds.size.x - 12.f, bounds.size.y - 12.f });
-
-        for (int i = 0; i < tileCount; i++) {
-            if (hitbox.findIntersection(tiles[i].boun())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-public:
-    Botom() : enemy(nullptr), frozenOverlay(frozenSharedTexture) {
-        tex[0].loadFromFile("botom_orange/botom_orange_walk_11.png");
-        tex[1].loadFromFile("botom_orange/botom_orange_walk_12.png");
-        tex[2].loadFromFile("botom_orange/botom_orange_walk_13.png");
-        tex[3].loadFromFile("botom_orange/Botom_bruh.png");
-        tex[4].loadFromFile("botom_orange/Botom_orange_fall.png");
-        tex[5].loadFromFile("botom_orange/botom_jump.png");
-        bool loaded = spriteSheet.loadFromFile("Sprite Sheet/Botom_Orange.png");
-
-        //enemy = new Sprite(spriteSheet);
-        enemy = new Sprite(tex[0]);
-        walkFrames[0] = IntRect({ 96, 360 }, { 94, 95 });
-        walkFrames[1] = IntRect({ 190, 395 }, { 102, 96 });
-        walkFrames[2] = IntRect({ 7, 469 }, { 91, 107 });
-
-        //enemy->setTextureRect(walkFrames[0]);
-
-        float sx = Level::TILE_W / (float)walkFrames[0].size.x;
-        float sy = Level::TILE_H / (float)walkFrames[0].size.y;
-        enemyScale = (sx < sy) ? sx : sy;  // Scale based on frame size, not full sheet
-        enemy->setScale({ enemyScale, enemyScale });
-        enemy->setOrigin({ walkFrames[0].size.x / 2.f, walkFrames[0].size.y / 2.f });
-
-        // Load frozen texture once (shared across all enemies)
-        if (frozenSharedTexture.getSize().x == 0 || frozenSharedTexture.getSize().y == 0) {
-            frozenSharedTexture.loadFromFile("Sprite Sheet/Player_Blue.png");
-        }
-
-        // 4-stage ice overlay animation frames
-        frozenFrames[0] = IntRect({ 13, 919 }, { 57, 49 });
-        frozenFrames[1] = IntRect({ 83, 903 }, { 65, 65 });
-        frozenFrames[2] = IntRect({ 176, 899 }, { 72, 70 });
-        frozenFrames[3] = IntRect({ 260, 883 }, { 69, 86 });
-
-        frozenIndex = 0;
-    }
-
-    float distanceChecker(Tiles* tiles, int tileCount) {
-        auto bounds = enemy->getGlobalBounds();
-        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-            { bounds.size.x - 12.f, bounds.size.y - 12.f });
-        for (int i = 0; i < tileCount; i++) {
-            if (hitbox.findIntersection(tiles[i].boun())) {
-                for (int j = 0; j < tileCount; j++) {
-                    if (tiles[i].getX() == tiles[j].getX() && tiles[j].getY() < tiles[i].getY()) {
-                        double distance = hypot(tiles[j].getX() - enemy->getPosition().x,
-                            tiles[j].getY() - enemy->getPosition().y);
-                        return distance;
-                    }
-                }
-            }
-        }
-        return 0.f;
-    }
-    void updateFrozen() {
-        if (!frozen) return;
-
-        float elapsed = freezeClock.getElapsedTime().asSeconds();
-
-        // Every 1.5s, melt one stage (decrement frozenIndex)
-        if (elapsed > 1.0f) {
-            frozenIndex--;
-            if (frozenIndex < 0) {
-                // Fully melted — enemy is free again
-                frozen = false;
-                frozenIndex = 0;
-            }
-            freezeClock.restart(); // restart timer for next melt stage
-        }
-    }
-    void freeze(bool full = false) {
-        if (full) {
-            frozenIndex = 3; // Max ice stage
-            frozen = true;
-            freezeClock.restart();
-            return;
-        }
-
-        if (frozen) {
-            // Already frozen — stack more ice (max frame 3)
-            if (frozenIndex < 3) {
-                frozenIndex++;
-            }
-        }
-        else {
-            // First hit — start at frame 0 (lightest ice)
-            frozenIndex = 0;
-        }
-        frozen = true;
-        freezeClock.restart(); // reset melt timer on each hit
-    }
-    void kick(float directionX) {
-        rolling = true;
-        rollingVelocityX = directionX * 8.f;  // fast horizontal speed
-        rollingClock.restart();                // start the timeout
-    }
-    void kill() {
-        // Don't die instantly — enter the "dying" state first
-        // This gives us time to play a shrink/flash animation
-        dying = true;
-        dyingClock.restart();
-        // Stop all other behavior
-        frozen = false;
-        rolling = false;
-    }
-    void updateDying() {
-        if (!dying) return;
-
-        float elapsed = dyingClock.getElapsedTime().asSeconds();
-        float duration = 0.4f;  // total death animation time
-
-        if (elapsed < duration) {
-            // Shrink from full size → 0 over 0.4 seconds
-            //   "elapsed / duration" goes from 0.0 → 1.0
-            //   "1.0 - that" goes from 1.0 → 0.0  (shrinking)
-            float t = 1.f - (elapsed / duration);
-            enemy->setScale({ enemyScale * t, enemyScale * t });
-        }
-        else {
-            // Animation done — truly dead now
-            alive = false;
-            dying = false;
-            enemy->setPosition({ -999.f, -999.f });
-        }
-    }
-    Sprite getFrozenOverlay() {
-        // Return the overlay sprite positioned at enemy's position
-        // Call this to draw frozen effect on top
-        if (!frozen) {
-            // Return a sprite that won't draw (we check in main loop)
-            Sprite empty(frozenSharedTexture);
-            empty.setPosition({ -999.f, -999.f });  // offscreen
-            return empty;
-        }
-
-        frozenOverlay.setTextureRect(frozenFrames[frozenIndex]);
-        frozenOverlay.setPosition(enemy->getPosition());
-        frozenOverlay.setOrigin({ frozenFrames[frozenIndex].size.x / 2.f,
-                                  frozenFrames[frozenIndex].size.y / 2.f });
-        return frozenOverlay;
-    }
-    enum GravityState { NORMAL, JUMPING_UP };
-    GravityState currentState = NORMAL;
-    void setGravity(float g) { gravity = g; }
-    void applyGravity(Tiles* tiles, int tileCount) {
-        velocityY += gravity;
-        float limit = enemy->getPosition().y + velocityY;
-        if (limit < 15.f) {
-            velocityY = 15.f - enemy->getPosition().y;
-        }
-        enemy->move({ 0.f, velocityY });
-
-        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-            enemy->move({ 0.f, -velocityY });
-            velocityY = 0.f;
-            onGround = true;
-            isJump = false;
-        }
-        else {
-            onGround = false;
-            if (velocityY < 0)
-                enemy->setTexture(tex[4]);
-            else
-                enemy->setTexture(tex[4]);
-        }
-    }
-    void antiGravity(Tiles* tiles, int tileCount) {
-        if (currentState == NORMAL && upCheckCollision(tiles, tileCount)) {
-            // Start the jump
-            float distance = distanceChecker(tiles, tileCount);
-            velocityY = -5.0f;  // Initial jump speed
-            currentState = JUMPING_UP;
-            enemy->setTexture(tex[5]);
-        }
-
-        if (currentState == JUMPING_UP) {
-            velocityY += gravity * 0.5f;  // Slower gravity while jumping up
-            enemy->move({ 0.f, velocityY });
-
-            // Check if reached upper tile
-            if (upCheckCollision(tiles, tileCount) && velocityY >= 0) {
-                enemy->move({ 0.0f, -velocityY });
-                velocityY = 0.0f;
-                currentState = NORMAL;  // Reset
-                onUpper = true;
-            }
-        }
-    }
-    bool getAnti() {
-        return anti;
-    }
-
-    bool checkTileBelow(Tiles* tiles, int tileCount) {
-        auto bounds = enemy->getGlobalBounds();
-        // Check a bit below the enemy's feet
-        FloatRect checkArea({ bounds.position.x + 6.f, bounds.position.y + bounds.size.y },
-            { bounds.size.x - 20.f, 4.f }); // 5 pixels below
-
-        for (int i = 0; i < tileCount; i++) {
-            if (checkArea.findIntersection(tiles[i].boun())) {
-                return true;
-            }
-        }
-        return false;
-    }
-    void movement(Tiles* tiles, int tileCount) {
-        if (!alive || dying) return;  // dead/dying enemies do nothing
-        if (enemy->getPosition().y > 650.f) {
-            kill();
-            return;
-        }
-        // --- ROLLING STATE: fast horizontal movement with gravity ---
-        if (rolling) {
-            // Timeout: after 3 seconds of rolling, the snowball breaks
-            if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
-                kill();
-                return;
-            }
-
-            // Gravity still applies while rolling
-            velocityY += gravity;
-            enemy->move({ 0.f, velocityY });
-
-            if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-                enemy->move({ 0.f, -velocityY });
-                velocityY = 0.f;
-            }
-
-            // Move horizontally at high speed
-            enemy->move({ rollingVelocityX, 0.f });
-
-            // Screen wrap or break (classic Snow Bros behavior)
-            auto pos = enemy->getPosition();
-            if (pos.y > 500.f) {
-                // On the bottom floor, the rolling snowball breaks when going off-screen
-                if (pos.x > 800.f || pos.x < 0.f) {
-                    kill();
-                }
-            }
-            else {
-                // On higher floors, it wraps around
-                if (pos.x > 800.f) enemy->setPosition({ 0.f, pos.y });
-                if (pos.x < 0.f)   enemy->setPosition({ 800.f, pos.y });
-            }
-
-            return; // skip normal walking logic
-        }
-        if (frozen) return;
-
-        //functiosn related to botom movement start from here
-        if (mv1 == true) {
-            enemy->move({ -speed, -0.0f });
-            enemy->setScale({ 89.f / 185.f,97.f / 185.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                //enemy->setTextureRect(walkFrames[frames]);
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-
-            }
-        }
-        else if (mv1 == false) {
-            enemy->move({ +speed, -0.0f });
-            enemy->setScale({ -89.f / 185.f,97.f / 185.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                //enemy->setTextureRect(walkFrames[frames]);
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-            }
-        }
-
-
-        if (enemy->getPosition().x >= 750 && enemy->getPosition().x <= 800) {
-            mv1 = true;
-            //enemy->setTextureRect(walkFrames[2]);
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-        }
-        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
-            mv1 = false;
-            //enemy->setTextureRect(walkFrames[2]);
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-        }
-
-    }
-    Sprite getEnemy() {
-        return *enemy;
-    }
-    void setPos(float i) {
-        enemy->setPosition({ 350.f, 65.f + i * 65.f });
-    }
-    void setPos(int row, int col) {
-        enemy->setPosition({ col * Level::TILE_W + Level::TILE_W / 2.f,
-                             row * Level::TILE_H + Level::TILE_H / 2.f });
-    }
-    void setPos(float x, float y, float xx, float yy) {
-        enemy->setOrigin({ xx,yy });
-        enemy->setPosition({ x,y });
-    }
-    void setOrigin(float x, float y) {
-        enemy->setOrigin({ x,y });
-    }
-    void setmv1(bool x) {
-        mv1 = x;
-    }
-    bool getmv1() {
-        return mv1;
-    }
-    void setScale(float x, float y) {
-        enemy->setScale({ 97.f / x,89.f / y });
-    }
-    bool isFrozen() {
-        return frozen;
-    }
-    bool isFullyFrozen() {
-        return frozen && frozenIndex == 3;
-    }
-    bool isRolling() {
-        return rolling;
-    }
-    bool isDying() {
-        return dying;
-    }
-    bool isAlive() {
-        return alive && !dying;  // dying enemies count as "not alive" for gameplay
-    }
-    FloatRect boun() {
-        return enemy->getGlobalBounds();
-    }
-    void reset() {
-        alive = true;
-        dying = false;
-        frozen = false;
-        rolling = false;
-        frozenIndex = 0;
-        velocityY = 0.f;
-        rollingVelocityX = 0.f;
-    }
-    ~Botom() {
-        delete enemy;
-        enemy = nullptr;
-    }
-};
-
-class Fooga : public Botom {
-protected:
-    bool isFlying;
-    float velocity_X = 0.125f;
-public:
-    Fooga() {
-        tex[0].loadFromFile("fooga/flying_01.png");
-        tex[1].loadFromFile("fooga/flying_02.png");
-        tex[2].loadFromFile("fooga/flying_03.png");
-        tex[3].loadFromFile("fooga/flying_01.png");
-        tex[4].loadFromFile("fooga/flying_01.png");
-        enemy = new Sprite(tex[0]);
-    }
-    void Axis_move() {
-        enemy->move({ speed + velocity_X, speed + velocityY });
-    }
-    void Ariel_move() {
-        enemy->move({ speed - velocity_X, speed - velocityY });
-    }
-    void movement(Tiles* tiles, int tileCount) {
-        if (!alive || dying) return;
-        if (rolling) {
-            // Timeout: after 3 seconds of rolling, the snowball breaks
-            if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
-                kill();
-                return;
-            }
-
-            // Gravity still applies while rolling
-            velocityY += gravity;
-            enemy->move({ 0.f, velocityY });
-
-            if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-                enemy->move({ 0.f, -velocityY });
-                velocityY = 0.f;
-            }
-
-            // Move horizontally at high speed
-            enemy->move({ rollingVelocityX, 0.f });
-
-            // Screen wrap or break (classic Snow Bros behavior)
-            auto pos = enemy->getPosition();
-            if (pos.y > 500.f) {
-                // On the bottom floor, the rolling snowball breaks when going off-screen
-                if (pos.x > 800.f || pos.x < 0.f) {
-                    kill();
-                }
-            }
-            else {
-                // On higher floors, it wraps around
-                if (pos.x > 800.f) enemy->setPosition({ 0.f, pos.y });
-                if (pos.x < 0.f)   enemy->setPosition({ 800.f, pos.y });
-            }
-
-            return; // skip normal walking logic
-        }
-        if (frozen) return;
-        //things related to fooga flying start from here
-        if (mv1 == true && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
-            velocity_X -= 0.0625f;
-            velocityY = velocityY;
-            enemy->move({ -speed, -velocityY + speed });
-            enemy->setScale({ 177.f / 455.f,180.f / 455.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-
-            }
-        }
-        else if (mv1 == false && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
-            velocity_X -= 0.0625f;
-            velocityY = velocityY;
-            enemy->move({ +speed, +velocityY });
-            enemy->setScale({ -177.f / 455.f,180.f / 455.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-            }
-        }
-        else if (enemy->getPosition().y < 25.f) {
-            velocity_X += 0.0625f;
-            velocityY += 0.75f;
-            enemy->move({ speed, velocityY });
-            enemy->setScale({ -177.f / 455.f,180.f / 455.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-            }
-        }
-
-        else {
-            velocity_X -= 0.0625f;
-            velocityY -= 0.5f;
-            enemy->move({ speed, velocityY });
-            enemy->setScale({ -177.f / 455.f,180.f / 455.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 3)
-                    frames = 0;
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-            }
-        }
-        if (enemy->getPosition().x >= 725 && enemy->getPosition().x <= 800) {
-            mv1 = true;
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-            velocity_X -= 0.0625f;
-            velocityY = -velocityY;
-
-
-        }
-        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
-            mv1 = false;
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-            velocity_X += 0.0625f;
-            velocityY = -velocityY;
-        }
-        if (enemy->getPosition().y >= 0 && enemy->getPosition().y <= 15) {
-            mv1 = false;
-            enemy->setTexture(tex[1]);
-            pausef = 60;
-            velocity_X += 0.0625;
-            velocityY = velocityY;
-        }
-        if (enemy->getPosition().y >= 550 && enemy->getPosition().y <= 600) {
-            mv1 = false;
-            enemy->setTexture(tex[1]);
-            pausef = 60;
-            velocity_X -= 0.25f;
-            velocityY -= 0.5f;
-        }
-        if (enemy->getPosition().x <= 0 && enemy->getPosition().y <= 0) {
-            mv1 = false;
-            enemy->setTexture(tex[1]);
-            pausef = 60;
-            velocity_X += 0.0625;
-            velocityY = -velocityY;
-        }
-    }
-
-
-};
-
-class Tornado : public Fooga {
-protected:
-Texture spin[8];
-int spinFrames = 0;
-public:
-    Tornado() {
-    tex[0].loadFromFile("tornado/tornado_blue_idle.png");
-    tex[1].loadFromFile("tornado/tornado_blue_01.png");
-    tex[2].loadFromFile("tornado/tornado_blue_02.png");
-    tex[3].loadFromFile("tornado/tornado_blue_03.png");
-    tex[4].loadFromFile("tornado/tornado_blue_03.png");
-    tex[5].loadFromFile("tornado/tornado_blue_03.png");
-    enemy->setTexture(tex[0]);
-    spin[0].loadFromFile("tornado/tornado_blue_spin_01.png");
-    spin[1].loadFromFile("tornado/tornado_blue_spin_02.png");
-    spin[2].loadFromFile("tornado/tornado_blue_spin_03.png");
-    spin[3].loadFromFile("tornado/tornado_blue_spin_04.png");
-    spin[4].loadFromFile("tornado/tornado_blue_spin_05.png");
-    spin[5].loadFromFile("tornado/tornado_blue_spin_06.png");
-    spin[6].loadFromFile("tornado/tornado_blue_spin_07.png");
-    spin[7].loadFromFile("tornado/tornado_blue_spin_08.png");
-
-   
-}
-    //enum MovingState { NORMAL, SPINNING };
-    //MovingState currentState = SPINNING;
-    void movement_spin(Tiles* tiles, int tileCount) {
-        if (!alive || dying) return;
-        if (rolling) {
-            // Timeout: after 3 seconds of rolling, the snowball breaks
-            if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
-                kill();
-                return;
-            }
-
-            // Gravity still applies while rolling
-            velocityY += gravity;
-            enemy->move({ 0.f, velocityY });
-
-            if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-                enemy->move({ 0.f, -velocityY });
-                velocityY = 0.f;
-            }
-
-            // Move horizontally at high speed
-            enemy->move({ rollingVelocityX, 0.f });
-
-            // Screen wrap or break (classic Snow Bros behavior)
-            auto pos = enemy->getPosition();
-            if (pos.y > 500.f) {
-                // On the bottom floor, the rolling snowball breaks when going off-screen
-                if (pos.x > 800.f || pos.x < 0.f) {
-                    kill();
-                }
-            }
-            else {
-                // On higher floors, it wraps around
-                if (pos.x > 800.f) enemy->setPosition({ 0.f, pos.y });
-                if (pos.x < 0.f)   enemy->setPosition({ 800.f, pos.y });
-            }
-
-            return; // skip normal walking logic
-        }
-        if (frozen) return;
-      
-        if (mv1 == true && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
-            velocity_X -= 0.0625f;
-            velocityY = velocityY;
-            enemy->move({ -speed, -velocityY + speed });
-            enemy->setScale({ 131.f / 325.f,122.f / 325.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (spinFrames)++;
-                if (spinFrames >= 8)
-                    spinFrames = 4;
-                enemy->setTexture(spin[spinFrames]);
-                clocks.restart();
-                //currentState = NORMAL;
-            }
-        }
-        else if (mv1 == false && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
-            velocity_X -= 0.0625f;
-            velocityY = velocityY;
-            enemy->move({ +speed, +velocityY });
-            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (spinFrames)++;
-                if (spinFrames >= 8)
-                    spinFrames = 4;
-                enemy->setTexture(spin[spinFrames]);
-                clocks.restart();
-               // currentState = NORMAL;
-            }
-        }
-        else if (enemy->getPosition().y < 25.f) {
-            velocity_X += 0.0625f;
-            velocityY += 0.75f;
-            enemy->move({ speed, velocityY });
-            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (spinFrames)++;
-                if (spinFrames >= 8)
-                    spinFrames = 4;
-                enemy->setTexture(spin[spinFrames]);
-                clocks.restart();
-                //currentState = NORMAL;
-            }
-        }
-
-        else {
-            velocity_X -= 0.0625f;
-            velocityY -= 0.5f;
-            enemy->move({ speed, velocityY });
-            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (spinFrames)++;
-                if (spinFrames >= 8)
-                    spinFrames = 4;
-                enemy->setTexture(spin[spinFrames]);
-                clocks.restart();
-                //currentState = NORMAL;
-            }
-        }
-        if (enemy->getPosition().x >= 725 && enemy->getPosition().x <= 800) {
-            mv1 = true;
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-            velocity_X -= 0.0625f;
-            velocityY = -velocityY;
-
-
-        }
-        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
-            mv1 = false;
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-            velocity_X += 0.0625f;
-            velocityY = -velocityY;
-        }
-        if (enemy->getPosition().y >= 0 && enemy->getPosition().y <= 15) {
-            mv1 = false;
-            enemy->setTexture(tex[1]);
-            pausef = 60;
-            velocity_X += 0.0625;
-            velocityY = velocityY;
-        }
-        if (enemy->getPosition().y >= 550 && enemy->getPosition().y <= 600) {
-            mv1 = false;
-            enemy->setTexture(tex[1]);
-            pausef = 60;
-            velocity_X -= 0.25f;
-            velocityY -= 0.5f;
-        }
-        if (enemy->getPosition().x <= 0 && enemy->getPosition().y <= 0) {
-            mv1 = false;
-            enemy->setTexture(tex[1]);
-            pausef = 60;
-            velocity_X += 0.0625;
-            velocityY = -velocityY;
-        }
-    }
-    void movement_normal(Tiles* tiles, int tileCount) {
-        if (!alive || dying) return;  // dead/dying enemies do nothing
-        if (enemy->getPosition().y > 650.f) {
-            kill();
-            return;
-        }
-        // --- ROLLING STATE: fast horizontal movement with gravity ---
-        if (rolling) {
-            // Timeout: after 3 seconds of rolling, the snowball breaks
-            if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
-                kill();
-                return;
-            }
-
-            // Gravity still applies while rolling
-            velocityY += gravity;
-            enemy->move({ 0.f, velocityY });
-
-            if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-                enemy->move({ 0.f, -velocityY });
-                velocityY = 0.f;
-            }
-
-            // Move horizontally at high speed
-            enemy->move({ rollingVelocityX, 0.f });
-
-            // Screen wrap or break (classic Snow Bros behavior)
-            auto pos = enemy->getPosition();
-            if (pos.y > 500.f) {
-                // On the bottom floor, the rolling snowball breaks when going off-screen
-                if (pos.x > 800.f || pos.x < 0.f) {
-                    kill();
-                }
-            }
-            else {
-                // On higher floors, it wraps around
-                if (pos.x > 800.f) enemy->setPosition({ 0.f, pos.y });
-                if (pos.x < 0.f)   enemy->setPosition({ 800.f, pos.y });
-            }
-
-            return; // skip normal walking logic
-        }
-        if (frozen) return;
-
-        //functiosn related to botom movement start from here
-        if (mv1 == true) {
-            enemy->move({ -speed, -0.0f });
-            enemy->setScale({ 131.f / 325.f,122.f / 325.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 4)
-                    frames = 1;
-                //enemy->setTextureRect(walkFrames[frames]);
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-                //currentState = SPINNING;
-            }
-        }
-        else if (mv1 == false) {
-            enemy->move({ +speed, -0.0f });
-            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
-            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
-                (frames)++;
-                if (frames >= 4)
-                    frames = 1;
-                //enemy->setTextureRect(walkFrames[frames]);
-                enemy->setTexture(tex[frames]);
-                clocks.restart();
-                //currentState = SPINNING;
-            }
-        }
-
-
-        if (enemy->getPosition().x >= 750 && enemy->getPosition().x <= 800) {
-            mv1 = true;
-            //enemy->setTextureRect(walkFrames[2]);
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-        }
-        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
-            mv1 = false;
-            //enemy->setTextureRect(walkFrames[2]);
-            enemy->setTexture(tex[3]);
-            pausef = 60;
-        }
-
-    }
-};
-
-void mover(int n, Botom* other, Tiles* tiles, int tileCount) {
-    for (int i = 0; i < n; i++) {
-        if (!other[i].isAlive()) continue;  // skip dead
-        other[i].movement(tiles, tileCount);
-    }
-}
-
-void Draw(int n, Botom* other, RenderWindow& window) {
-    for (int i = 0; i < n; i++) {
-        if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
-        window.draw(other[i].getEnemy());
-    }
-}
-
-void mover(int n, Fooga* other, Tiles* tiles, int tileCount) {
-    for (int i = 0; i < n; i++)
-        other[i].movement(tiles, tileCount);
-}
-
-void Draw(int n, Fooga* other, RenderWindow& window) {
-    for (int i = 0; i < n; i++) {
-        if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
-        window.draw(other[i].getEnemy());
-    }
-}
-
-void Draw(int n, Tornado* other, RenderWindow& window) {
-    for (int i = 0; i < n; i++) {
-        if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
-        window.draw(other[i].getEnemy());
-    }
-}
-
-void mover(int n, Tornado* other, Tiles* tiles, int tileCount) {
-    for (int i = 0; i < n; i++) {
-        int r = rand()%50;
-        if(r != 1)
-        other[i].movement_normal(tiles, tileCount);
-        else if( r == 1)
-        other[i].movement_spin(tiles, tileCount);
-    }
-}
-
-void setPos(float x, float y, int n, Botom* other) {
-    for (int i = 0; i < n; i++) {
-        other[i].setOrigin(x, y);
-        other[i].setPos(i);
-        if (i % 2 == 1)
-            other[i].setmv1(false);
-        else
-            other[i].setmv1(true);
-    }
-}
-
-void Gravity(int n, Botom* other, Tiles* tiles, int c) {
-    for (int i = 0; i < n; i++) {
-        if (other[i].currentState == Botom::JUMPING_UP) {
-            other[i].antiGravity(tiles, c);
-        }
-        else {
-            bool isTile = other[i].checkTileBelow(tiles, c);
-            if (!isTile) {
-                other[i].applyGravity(tiles, c);
-            }
-            else {
-                int x = rand() % 50;
-                if (x == 1)
-                    other[i].antiGravity(tiles, c);
-                else if (x == 2)
-                    other[i].applyGravity(tiles, c);
-
-            }
-        }
-    }
-}
-
-void Gravity(int n, Fooga* other, Tiles* tiles, int c) {
-    for (int i = 0; i < n; i++) {
-        if (other[i].isFullyFrozen() || other[i].isFrozen()) {
-            bool isTile = other[i].checkTileBelow(tiles, c);
-            if (!isTile) {
-                other[i].applyGravity(tiles, c);
-            }
-        }
-    }
-}
-
-void Gravity(Tornado* other, int n, Tiles* tiles, int c) {
-    for (int i = 0; i < n; i++) {
-        if (other[i].currentState == Tornado::JUMPING_UP) {
-            other[i].antiGravity(tiles, c);
-        }
-        else {
-            bool isTile = other[i].checkTileBelow(tiles, c);
-            if (!isTile) {
-                other[i].applyGravity(tiles, c);
-            }
-            else {
-                int x = rand() % 50;
-                if (x == 1)
-                    other[i].antiGravity(tiles, c);
-                else if(x == 2)
-                    other[i].applyGravity(tiles, c);
-
-            }
-        }
-    }
-}
-
-//////////////////////////////// SNOWBALL CLASS //////////////////////////////////////
-
-class Snowball {
-public:
-    static Texture sharedTexture;
-    Sprite snowball;
-    IntRect projFrames[2]; // [0] flying snowball, [1] burst on impact
-    int frameIndex;
-    float renderScale;
-    float velocityX;
-    float velocityY;
-    float gravity;
-    bool active;    // state 1
-    bool bursting; // state 2
-    Clock clock;
-    Clock burstClock;
-
-    Snowball() : snowball(sharedTexture) {
-        if (sharedTexture.getSize().x == 0 || sharedTexture.getSize().y == 0) {
-            sharedTexture.loadFromFile("Sprite Sheet/Items.png");
-        }
-        snowball.setTexture(sharedTexture);
-
-        // Flying and burst frames
-        projFrames[0] = IntRect({ 307, 1121 }, { 179, 152 }); // blue blob
-        projFrames[1] = IntRect({ 487, 1115 }, { 161, 161 }); // orange burst
-
-        frameIndex = 0;
-        snowball.setTextureRect(projFrames[frameIndex]);
-        snowball.setOrigin({ projFrames[frameIndex].size.x / 2.f, projFrames[frameIndex].size.y / 2.f });
-
-        float sx = (Level::TILE_W * 0.8f) / (float)projFrames[frameIndex].size.x;
-        float sy = (Level::TILE_H * 0.8f) / (float)projFrames[frameIndex].size.y;
-        renderScale = (sx < sy) ? sx : sy;
-        snowball.setScale({ renderScale, renderScale });
-
-        active = false;
-        bursting = false;
-        velocityX = 0.f;
-        velocityY = 0.f;
-        gravity = 0.3f;
-    }
-
-    void spawn(float x, float y, float directionX) {
-        // Reset state for a fresh projectile
-        bursting = false;
-
-        float spawnX = x + directionX * (Level::TILE_W * 0.65f);
-        float spawnY = y - Level::TILE_H * 0.15f;
-        snowball.setPosition({ spawnX, spawnY });
-
-        velocityX = directionX * 4.5f;
-        velocityY = -3.0f;
-
-        frameIndex = 0;
-        snowball.setTextureRect(projFrames[frameIndex]);
-        snowball.setOrigin({ projFrames[frameIndex].size.x / 2.f, projFrames[frameIndex].size.y / 2.f });
-
-        if (directionX > 0.f)
-            snowball.setScale({ -renderScale, renderScale });
-        else
-            snowball.setScale({ renderScale, renderScale });
-
-        active = true;
-        clock.restart();
-    }
-
-    void update(Tiles* tiles, int tileCount) {
-        if (!active) return;
-
-        // If already bursting, show burst briefly then remove projectile.
-        if (bursting) {
-            if (burstClock.getElapsedTime().asSeconds() > 0.12f) {
-                active = false;
-                bursting = false;
-            }
-            return;
-        }
-
-        // Save previous-frame hitbox before movement.
-        auto before = snowball.getGlobalBounds();
-        float insetX = before.size.x * 0.22f;
-        float insetY = before.size.y * 0.28f;
-        FloatRect prevHitbox({ before.position.x + insetX, before.position.y + insetY },
-            { before.size.x - insetX * 2.f, before.size.y - insetY * 2.f });
-
-        // Projectile motion
-        velocityY += gravity;
-        snowball.move({ velocityX, velocityY });
-
-        // Check collision with floor only while falling. 
-        // This prevents "head hit" while moving upward.
-        if (velocityY >= 0.f) {
-            auto sb = snowball.getGlobalBounds();
-            FloatRect hitbox({ sb.position.x + insetX, sb.position.y + insetY },
-                { sb.size.x - insetX * 2.f, sb.size.y - insetY * 2.f });
-
-            for (int i = 0; i < tileCount; i++) {
-                FloatRect tile = tiles[i].boun();
-                if (hitbox.findIntersection(tile)) {
-                    float prevBottom = prevHitbox.position.y + prevHitbox.size.y;
-                    float tileTop = tile.position.y;
-
-                    // Top-surface hit only
-                    if (prevBottom <= tileTop + 4.f) {
-                        bursting = true;
-                        velocityX = 0.f;
-                        velocityY = 0.f;
-
-                        frameIndex = 1;
-                        snowball.setTextureRect(projFrames[frameIndex]);
-                        snowball.setOrigin({ projFrames[frameIndex].size.x / 2.f, projFrames[frameIndex].size.y / 2.f });
-
-                        burstClock.restart();
-                        return;
-                    }
-                }
-            }
-        }
-
-        auto pos = snowball.getPosition();
-
-        // Screen wrap horizontally
-        if (pos.x > 800.f) snowball.setPosition({ 0.f, pos.y });
-        if (pos.x < 0.f)   snowball.setPosition({ 800.f, pos.y });
-
-        // End projectile after short range (or long range if power-up active)
-        float maxTime = hasDistanceIncrease ? 2.5f : 0.6f;
-        if (pos.y > 600.f || clock.getElapsedTime().asSeconds() > maxTime) {
-            active = false;
-        }
-    }
-
-    void draw(RenderWindow& window) {
-        if (active) window.draw(snowball);
-    }
-
-    FloatRect getBounds() {
-        return snowball.getGlobalBounds();
-    }
-};
+enum class GameState { Login, MainMenu, ModeSelect, Shop, Playing, Paused, LevelComplete, GameOver, GameComplete, Signup, FlashScreen, LevelSelect, Ranking, Victory, CharacterSelect };
+
+// Function declarations
+void mover(int n, Botom* other, Tiles* tiles, int tileCount);
+void Draw(int n, Botom* other, RenderWindow& window);
+void mover(int n, Fooga* other, Tiles* tiles, int tileCount);
+void Draw(int n, Fooga* other, RenderWindow& window);
+void Draw(int n, Tornado* other, RenderWindow& window);
+void mover(int n, Tornado* other, Tiles* tiles, int tileCount);
+void Gravity(int n, Botom* other, Tiles* tiles, int c);
+void Gravity(int n, Fooga* other, Tiles* tiles, int c);
+void Gravity(Tornado* other, int n, Tiles* tiles, int c);
 
 bool snowballHitsEnemy(Snowball& snowball, Botom& enemy, bool hasPower) {
     if (!snowball.active) return false;
-
-    if (snowball.getBounds().findIntersection(enemy.boun())) {
+    if (snowball.boun().findIntersection(enemy.boun())) {
         enemy.freeze(hasPower);
         return true;
     }
-
     return false;
 }
 
 bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileCount, bool hasPower) {
     if (!snowball.active) return false;
-
-    if (snowball.getBounds().findIntersection(enemy.boun())) {
+    if (snowball.boun().findIntersection(enemy.boun())) {
         enemy.freeze(hasPower);
         enemy.applyGravity(tiles, tileCount);
         return true;
     }
-
     return false;
 }
 
 
-
-//////////////////////////////// SNOWBALL end //////////////////////////////////////
-
-class Player : public Botom {
-protected:
-    float movementSpeed = 2.25f;
-    bool invincible = false;
-    Clock invincibilityClock;
-    Clock blinkClock;
-    bool visible = true;
-
-public:
-    Player() {
-        tex[0].loadFromFile("Characters/Enemies/nick_1.png");
-        tex[1].loadFromFile("Characters/Enemies/nick_2.png");
-        tex[2].loadFromFile("Characters/Enemies/nick_3.png");
-        tex[3].loadFromFile("Characters/Enemies/nick_0.png"); // stationary 
-        delete enemy;
-        enemy = new Sprite(tex[0]);
-
-        float sx = Level::TILE_W / (float)tex[0].getSize().x;
-        float sy = Level::TILE_H / (float)tex[0].getSize().y;
-        playerScale = (sx < sy) ? sx : sy;
-        enemy->setScale({ playerScale, playerScale });
-        enemy->setOrigin({ tex[0].getSize().x / 2.f, tex[0].getSize().y / 2.f });
-    }
-
-    void startInvincibility() {
-        invincible = true;
-        invincibilityClock.restart();
-        blinkClock.restart();
-    }
-
-    void updateInvincibility() {
-        if (!invincible) {
-            enemy->setColor(Color::White);
-            return;
-        }
-
-        if (invincibilityClock.getElapsedTime().asSeconds() > 4.f) {
-            invincible = false;
-            enemy->setColor(Color::White);
-            return;
-        }
-
-        if (blinkClock.getElapsedTime().asSeconds() > 0.1f) {
-            visible = !visible;
-            enemy->setColor(visible ? Color::White : Color(255, 255, 255, 80));
-            blinkClock.restart();
-        }
-    }
-
-    bool isInvincible() const { return invincible; }
-
-    void setSpeed(float s) { movementSpeed = s; }
-
-    void applyGravity(Tiles* tiles, int tileCount) {
-        velocityY += gravity;
-        enemy->move({ 0.f, velocityY });
-
-        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-            enemy->move({ 0.f, -velocityY });
-            velocityY = 0.f;
-            onGround = true;
-
-        }
-        else {
-            onGround = false;
-            if (velocityY < 0)
-                enemy->setTexture(tex[1]);
-            else
-                enemy->setTexture(tex[2]);
-        }
-    }
-
-    void move(Keyboard::Key left, Keyboard::Key right, Keyboard::Key jump, Tiles* tiles, int tileCount) {
-
-        if (Keyboard::isKeyPressed(left)) {
-            enemy->move({ -movementSpeed, -0.0f });
-            if (checkCollision(tiles, tileCount)) {
-                enemy->move({ movementSpeed, -0.0f }); // undo movement
-            } else {
-                enemy->setScale({ playerScale, playerScale });
-                if (clocks.getElapsedTime().asSeconds() > frametime) {
-                    frames++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
-            }
-        }
-        if (Keyboard::isKeyPressed(right)) {
-            enemy->move({ +movementSpeed, -0.0f });
-            if (checkCollision(tiles, tileCount)) {
-                enemy->move({ -movementSpeed, -0.0f }); // undo movement
-            } else {
-                enemy->setScale({ -playerScale, playerScale });
-                if (clocks.getElapsedTime().asSeconds() > frametime) {
-                    frames++;
-                    if (frames >= 3)
-                        frames = 0;
-                    enemy->setTexture(tex[frames]);
-                    clocks.restart();
-                }
-            }
-        }
-
-        if (Keyboard::isKeyPressed(jump)) {
-            if (onGround) {
-                velocityY = jumpForce;
-                onGround = false;
-            }
-        }
-    }
-
-    float getDirectionX() {
-        return (enemy->getScale().x > 0.f) ? -1.f : 1.f; // +scale is A (left), -scale is D (right)
-    }
-
-    sf::Vector2f getPosition() {
-        return enemy->getPosition();
-    }
-
-    Sprite Draw() {
-        return *enemy;
-    }
-    ~Player() {
-    }
-};
-
-/////////////////// LOADING LEVELS //////////////////////////////
-
-void LoadLevel(
-    int levelNo,
-    Level& level,
-    Texture& bgTex,
-    Sprite& background,
-    Tiles*& tilt,
-    int& count)
-{
-    // choose level
-    if (levelNo == 1) SetupLevel1(level);
-    else if (levelNo == 2) SetupLevel2(level);
-    else if (levelNo == 3) SetupLevel3(level);
-    else if (levelNo == 4) SetupLevel4(level);
-    else if (levelNo == 5) SetupLevel5(level);
-    else if (levelNo == 6) SetupLevel6(level);
-    else if (levelNo == 7) SetupLevel7(level);
-    else if (levelNo == 8) SetupLevel8(level);
-    else if (levelNo == 9) SetupLevel9(level);
-    else if (levelNo == 10) SetupLevel10(level);
-
-    bgTex.loadFromFile(level.backgroundPath);
-    background = Sprite(bgTex);
-
-    // CHANGE LATER (check if the re-scale is needed)
-
-    if (bgTex.getSize().x > 0 && bgTex.getSize().y > 0) {
-        level.bgRect = IntRect({ 0, 0 }, { (int)bgTex.getSize().x, (int)bgTex.getSize().y });
-        background.setTextureRect(level.bgRect);
-        background.setScale({ 800.f / (float)bgTex.getSize().x, 600.f / (float)bgTex.getSize().y });
-    }
-
-    if (tilt != nullptr) {
-        delete[] tilt;
-        tilt = nullptr;
-    }
-
-    count = 0;
-    for (int r = 0; r < Level::ROWS; r++)
-        for (int c = 0; c < Level::COLS; c++)
-            if (level.grid[r][c] != 0) count++;
-
-    tilt = new Tiles[count];
-    int idx = 0;
-    for (int r = 0; r < Level::ROWS; r++) {
-        for (int c = 0; c < Level::COLS; c++) {
-            if (level.grid[r][c] != 0) {
-                tilt[idx].setpost(c * Level::TILE_W, r * Level::TILE_H);
-                idx++;
-            }
-        }
-    }
-}
-
-///////////////////////////////////// LEVEL LOADING END ////////////////////////////////////
-
-//---------------------------------MOGERAS SON JOHNs -----------------------------------
-
-class MogeraChild {
-protected:
-    Sprite* spawn;
-    Texture text[7];
-    int currentFrame = 0;
-    float frametime = 0.1f;
-    Clock animClock;
-    bool active = true;
-    bool isJump;
-    bool unUpper;
-    bool onGround = false;
-    float velocityY = 0.0f;
-    float gravity = 0.5f;
-    bool checkCollision(Tiles* tiles, int tileCount) {
-        auto bounds = spawn->getGlobalBounds();
-        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-            { bounds.size.x - 6.f, bounds.size.y - 12.f });
-
-        for (int i = 0; i < tileCount; i++) {
-            if (hitbox.findIntersection(tiles[i].boun())) {
-                return true;
-            }
-        }
-        return false;
-    }
-public:
-    MogeraChild() {
-        text[0].loadFromFile("spawn/spawn_01.png");
-        text[1].loadFromFile("spawn/spawn_02.png");
-        text[2].loadFromFile("spawn/spawn_03.png");
-        text[3].loadFromFile("spawn/spawn_04.png");
-        text[4].loadFromFile("spawn/spawn_05.png");
-        text[5].loadFromFile("spawn/spawn_06.png");
-        text[6].loadFromFile("spawn/spawn_07.png");
-        spawn = new Sprite(text[0]);
-    }
-    MogeraChild(const MogeraChild& other) {
-        for (int i = 0; i < 7; i++) {
-            text[i] = other.text[i];
-        }
-        spawn = new Sprite(text[other.currentFrame]);
-        spawn->setPosition(other.spawn->getPosition());
-        spawn->setOrigin(other.spawn->getOrigin());
-        spawn->setScale(other.spawn->getScale());
-
-        currentFrame = other.currentFrame;
-        frametime = other.frametime;
-        active = other.active;
-        animClock = other.animClock;
-    }
-    MogeraChild& operator=(const MogeraChild& other) {
-        if (this != &other) {
-            delete spawn;
-            for (int i = 0; i < 7; i++) {
-                text[i] = other.text[i];
-            }
-            spawn = new Sprite(text[other.currentFrame]);
-            spawn->setPosition(other.spawn->getPosition());
-            spawn->setOrigin(other.spawn->getOrigin());
-            spawn->setScale(other.spawn->getScale());
-
-            currentFrame = other.currentFrame;
-            frametime = other.frametime;
-            active = other.active;
-            animClock = other.animClock;
-        }
-        return *this;
-    }
-    void setPos(float x, float y, float w = 186.f, float h = 170.f) {
-        spawn->setOrigin({ w, h });
-        spawn->setPosition({ x, y });
-    }
-    enum GravityState { WALKING, JUMPING_UP };
-    GravityState currentState = WALKING;
-    void applyGravity(Tiles* tiles, int tileCount) {
-        velocityY += gravity;
-        float limit = spawn->getPosition().y + velocityY;
-        if (limit < 15.f) {
-            velocityY = 15.f - spawn->getPosition().y;
-        }
-        spawn->move({ 0.f, velocityY });
-
-        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-            spawn->move({ 0.f, -velocityY });
-            velocityY = 0.f;
-            onGround = true;
-            isJump = false;
-        }
-        else {
-            onGround = false;
-            if (velocityY < 0){
-                if (animClock.getElapsedTime().asSeconds() > frametime) {
-                    currentFrame++;
-                    if (currentFrame >= 7)
-                        currentFrame = 5;
-                    spawn->setTexture(text[currentFrame]);
-                    animClock.restart();
-                }
-              }
-            else {
-                if (animClock.getElapsedTime().asSeconds() > frametime) {
-                    currentFrame++;
-                    if (currentFrame >= 7)
-                        currentFrame = 5;
-                    spawn->setTexture(text[currentFrame]);
-                    animClock.restart();
-                }
-            }
-                
-        }
-    }
-    void movement() {
-    spawn->setScale({186.f/725.f, 170.f/690.f});
-        spawn->move({ -1.5f, 0.0f });
-
-        if (animClock.getElapsedTime().asSeconds() > frametime) {
-            currentFrame++;
-            if (currentFrame >= 7)
-                currentFrame = 0;
-            spawn->setTexture(text[currentFrame]);
-            animClock.restart();
-        }
-
-        if (spawn->getPosition().x > 750.f || spawn->getPosition().y > 550.f || spawn->getPosition().x <= 80.f) {
-            active = false;
-        }
-    }
-
-    bool isActive() {
-        return active;
-    }
 
     void Draw(RenderWindow& window) {
         if (active) {
             window.draw(*spawn);
         }
     }
-    FloatRect getBounds() {
-        return spawn->getGlobalBounds();
-    }
+
     ~MogeraChild() {
         delete spawn;
         spawn = nullptr;
@@ -1519,7 +99,7 @@ protected:
     int spawnCount;
     Clock spawnClock;
     float spawnInterval = 3.0f;  
-    bool isDead = true;
+    bool isDead = false;
 
 public:
 static int bossHp;
@@ -1533,12 +113,12 @@ static int bossHp;
         bossChest = new Sprite(bodyText[0]);
         bossLeg = new Sprite(legText[0]);
 
-        
+        // Initialize spawn array
         spawns = nullptr;
         spawnCount = 0;
     }
 
-    void movement(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db,string& username, int& lives, int& gems, int& score, int& levelNo) {
+    void movement(Tiles* tiles, int tileCount) {
         int x = rand() % 10;
         if (x == 1) {
             bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
@@ -1582,12 +162,6 @@ static int bossHp;
         for (int i = 0; i < spawnCount; i++) {
         spawns[i].applyGravity(tiles, tileCount);
             spawns[i].movement();
-            if (play.boun().findIntersection(spawns[i].getBounds())) {
-           
-                db.saveProgress(username, levelNo, lives-1, gems, score);
-                currentState = GameState::GameOver;
-                break;
-            }
         }
 
        
@@ -1609,7 +183,7 @@ static int bossHp;
     }
 
     void cleanupInactiveSpawns() {
-      
+        // Count active spawns
         int activeCount = 0;
         for (int i = 0; i < spawnCount; i++) {
             if (spawns[i].isActive()) {
@@ -1617,10 +191,10 @@ static int bossHp;
             }
         }
 
-       
+        // If all are active, no cleanup needed
         if (activeCount == spawnCount) return;
 
-       
+        // Create new array with only active spawns
         MogeraChild* newSpawns = new MogeraChild[activeCount];
         int index = 0;
         for (int i = 0; i < spawnCount; i++) {
@@ -1646,7 +220,7 @@ static int bossHp;
         window.draw(*bossChest);
         window.draw(*bossLeg);
 
-       
+        // Draw all spawns
         for (int i = 0; i < spawnCount; i++) {
             spawns[i].Draw(window);
         }
@@ -1670,12 +244,7 @@ static int bossHp;
     }
 
     bool getDeath() {
-    
         return isDead;
-    }
-
-    void setDead(bool x = false) {
-    isDead = x;
     }
 
     ~Mogera() {
@@ -1692,365 +261,19 @@ int Mogera::bossHp = 900;
 
 bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
     if (!snowball.active) return false;
-    // No isFrozen() guard — additional hits stack more ice layers
-
-    if (snowball.getBounds().findIntersection(boss.boun())) {
+    if (snowball.boun().findIntersection(boss.boun())) {
         boss.setCol();
         Mogera::bossHp--;
         return true;
     }
-
     return false;
 }
-//-----------------------------------MOGERA BOSS END--------------------------
 
-//------------------------GAMAKICHI BOSS-----------------------------------
-
-class Bomb : public MogeraChild {
-protected:
-Texture texts[4];
-Sprite* spawns;
-Clock lifeClock; 
-float explosionTime = 2.0f;  
-bool hasExploded = false;
-bool checkCollision(Tiles* tiles, int tileCount) {
-    auto bounds = spawn->getGlobalBounds();
-    FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
-        { bounds.size.x - 6.f, bounds.size.y - 12.f });
-
-    for (int i = 0; i < tileCount; i++) {
-        if (hitbox.findIntersection(tiles[i].boun())) {
-            return true;
-        }
-    }
-    return false;
-}
-public:
-    Bomb() {
-        texts[0].loadFromFile("bomb/bomb_01.png");
-        texts[1].loadFromFile("bomb/bomb_02.png");
-        texts[2].loadFromFile("bomb/bomb_03.png");
-        texts[3].loadFromFile("bomb/bomb_04.png");
-        spawns = new Sprite(texts[0]);
-        lifeClock.restart();
-       
-       }
-    Bomb(const Bomb& other) {
-        for (int i = 0; i < 4; i++) {
-            texts[i] = other.texts[i];
-        }
-        spawns = new Sprite(texts[other.currentFrame]);
-        spawns->setPosition(other.spawns->getPosition());
-        spawns->setOrigin(other.spawns->getOrigin());
-        spawns->setScale(other.spawns->getScale());
-
-        currentFrame = other.currentFrame;
-        frametime = other.frametime;
-        active = other.active;
-        animClock = other.animClock;
-    }
-    Bomb& operator=(const Bomb& other) {
-        if (this != &other) {
-            delete spawns;
-            for (int i = 0; i < 4; i++) {
-                texts[i] = other.texts[i];
-            }
-            spawns = new Sprite(texts[other.currentFrame]);
-            spawns->setPosition(other.spawns->getPosition());
-            spawns->setOrigin(other.spawns->getOrigin());
-            spawns->setScale(other.spawns->getScale());
-
-            currentFrame = other.currentFrame;
-            frametime = other.frametime;
-            active = other.active;
-            animClock = other.animClock;
-        }
-        return *this;
-    }
-    void setPos(float x, float y, float w = 220.f, float h = 250.f) {
-        spawns->setOrigin({ w, h });
-        spawns->setPosition({ x, y });
-    }
-    void applyGravity(Tiles* tiles, int tileCount) {
-        velocityY += gravity;
-        float limit = spawns->getPosition().y + velocityY;
-        if (limit < 15.f) {
-            velocityY = 15.f - spawns->getPosition().y;
-        }
-        spawn->move({ 0.f, velocityY });
-
-        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
-            spawns->move({ 0.f, -velocityY });
-            velocityY = 0.f;
-            onGround = true;
-            isJump = false;
-        }
-        else {
-            onGround = false;
-            if (velocityY < 0) {
-                if (animClock.getElapsedTime().asSeconds() > frametime) {
-                    currentFrame++;
-                    if (currentFrame >= 7)
-                        currentFrame = 5;
-                    spawns->setTexture(texts[currentFrame]);
-                    animClock.restart();
-                }
-            }
-            else {
-                if (animClock.getElapsedTime().asSeconds() > frametime) {
-                    currentFrame++;
-                    if (currentFrame >= 7)
-                        currentFrame = 5;
-                    spawns->setTexture(texts[currentFrame]);
-                    animClock.restart();
-                }
-            }
-
-        }
-    }
-    void movement() {
-        if (!hasExploded && lifeClock.getElapsedTime().asSeconds() >= explosionTime) {
-            explode();
-            return;  // Stop moving after explosion
-        }
-        spawns->setScale({ 220.f / 995.f, 250.f / 1090.f });
-        spawns->move({ -1.5f, 0.0f });
-
-        if (animClock.getElapsedTime().asSeconds() > frametime) {
-            currentFrame++;
-            if (currentFrame >= 4)
-                currentFrame = 0;
-            spawns->setTexture(texts[currentFrame]);
-            animClock.restart();
-        }
-
-        if (spawns->getPosition().x > 750.f || spawns->getPosition().y > 550.f || spawns->getPosition().x <= 80.f) {
-            active = false;
-        }
-    }
-    void explode() {
-        hasExploded = true;
-        active = false;  // Remove the bomb
-        // TODO: Add explosion animation/effect here
-        // TODO: Deal damage to player if in range
-    }
-    void Draw(RenderWindow& window) {
-        if (active) {
-            window.draw(*spawns);
-        }
-    }
-    bool isActive() {
-        return active;
-    }
-    FloatRect getBound() {
-        return spawns->getGlobalBounds();
-    }
-    ~Bomb() {
-        delete spawns;
-        spawns = nullptr;
-    }
-    };
-
-void vectory(Bomb*& a, int* n, Bomb v) {
-    *n += 1;
-    Bomb* arr = new Bomb[*n];
-    for (int i = 0; i < *n; i++) {
-        if (i < *n - 1)
-            arr[i] = a[i];
-        else
-            arr[i] = v;
-    }
-    delete[] a;
-    a = nullptr;
-    a = arr;
-}
-
-class Gamakichi : public Mogera {
-    protected:
-    Sprite* boss;
-    Texture text[2];
-    Texture smoke[4];
-    Sprite* smokey[4];
-    float speed = 1.25f;
-    Bomb* spawnss;
-    bool mv1 = false;
-    float pausef = 0;
-    bool isSmoke = false;
-    bool smokeStart = false;
-    Clock smokeClock;
-    float smokeDuration = 3.0f;
-    public:
-    static int bossHp;
-        Gamakichi() {
-            text[0].loadFromFile("gamakichi/gamakichi_01.png");
-            text[1].loadFromFile("gamakichi/gamakichi_02.png");
-            boss = new Sprite(text[0]);
-            smoke[0].loadFromFile("gamakichi/smoke_01.png");
-            smoke[1].loadFromFile("gamakichi/smoke_02.png");
-            smoke[2].loadFromFile("gamakichi/smoke_03.png");
-            smoke[3].loadFromFile("gamakichi/smoke_04.png");
-            smokey[0] = new Sprite(smoke[0]);
-            smokey[1] = new Sprite(smoke[0]);
-            smokey[2] = new Sprite(smoke[0]);
-            smokey[3] = new Sprite(smoke[0]);
-            spawns = nullptr;
-            spawnCount = 0;
-    }
-
-        void movements(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db, string& username, int& lives, int& gems, int& score, int& levelNo) {
-        boss->setScale({1128/3500.f, 622.f/1200.f});
-        if (isSmoke == true && smokeClock.getElapsedTime().asSeconds() >= smokeDuration) {
-            isSmoke = false;
-        }
-        if(isSmoke == false){
-            if (mv1 == false) {
-            isSmoke = false;
-                boss->move({+0.f, +speed});
-                if (clock.getElapsedTime().asSeconds() > frametime) {
-                    bodyFrames++;
-                    if (bodyFrames >= 2)
-                        bodyFrames = 0;
-                    boss->setTexture(text[bodyFrames]);
-                    clock.restart();
-                }
-            }
-           if (mv1 == true) {
-           isSmoke = false;
-                boss->move({ +0.f, -speed });
-                if (clock.getElapsedTime().asSeconds() > frametime) {
-                    bodyFrames++;
-                    if (bodyFrames >= 2)
-                        bodyFrames = 0;
-                    boss->setTexture(text[bodyFrames]);
-                    clock.restart();
-                }
-            }
-        }
-            if (boss->getPosition().y >= 1050 && boss->getPosition().y <= 1100 && smokeStart == false) {
-            isSmoke = true;
-            smokeStart = true;
-                mv1 = true;
-                boss->setTexture(text[1]);
-                pausef = 60;
-                smokeClock.restart();
-            }
-            if (isSmoke == true) {
-                if (clock.getElapsedTime().asSeconds() > frametime) {
-                    bodyFrames++;
-                    if (bodyFrames >= 4)
-                        bodyFrames = 0;
-                    for (int i = 0; i < 4; i++) {
-                        smokey[i]->setTexture(smoke[bodyFrames]);
-                    }
-                    clock.restart();
-                }
-            }
-            if (boss->getPosition().y >= 0 && boss->getPosition().y <= 50) {
-                mv1 = false;
-                smokeStart = false;
-                boss->setTexture(text[1]);
-                pausef = 60;
-            }
-            if (spawnClock.getElapsedTime().asSeconds() > spawnInterval) {
-                spawnEnemy();
-                spawnClock.restart();
-            }
-
-
-            for (int i = 0; i < spawnCount; i++) {
-                spawnss[i].applyGravity(tiles, tileCount);
-                spawnss[i].movement();
-                if (play.boun().findIntersection(spawnss[i].getBound())) {
-                    db.saveProgress(username, levelNo, lives-1, gems, score);
-                    currentState = GameState::GameOver;
-                    break;
-                }
-            }
-
-
-            cleanupInactiveSpawns();
-    }
-
-        void spawnEnemy() {
-            Bomb newSpawn;
-            newSpawn.setPos(boss->getPosition().x, boss->getPosition().y);
-            vectory(spawnss, &spawnCount, newSpawn);
-        }
-
-        void cleanupInactiveSpawns() {
-
-            int activeCount = 0;
-            for (int i = 0; i < spawnCount; i++) {
-                if (spawnss[i].isActive()) {
-                    activeCount++;
-                }
-            }
-
-
-            if (activeCount == spawnCount) return;
-
-
-            Bomb* newSpawns = new Bomb[activeCount];
-            int index = 0;
-            for (int i = 0; i < spawnCount; i++) {
-                if (spawnss[i].isActive()) {
-                    newSpawns[index] = spawnss[i];
-                    index++;
-                }
-            }
-
-            delete[] spawnss;
-            spawnss = newSpawns;
-            spawnCount = activeCount;
-        }
-
-        void setPos(float x, float y, float xx, float yy) {
-            boss->setOrigin({ xx, yy });
-            boss->setPosition({ x, y });
-        }
-
-        void Draw(RenderWindow& window, Tiles* tiles, int tileCount) {
-        if(isSmoke != true)
-            window.draw(*boss);
-            for (int i = 0; i < spawnCount; i++) {
-                spawnss[i].Draw(window);
-            }
-            if (isSmoke == true) {
-                for (int i = 0; i < 4; i++) {
-                smokey[i]->setScale({330.f/870.f, 190.f/500.f});
-                    smokey[i]->setPosition({175.f+i*100.f, 540.f});
-                    window.draw(*smokey[i]);
-                }
-            }
-            
-        }
-
-        FloatRect boun() {
-            return boss->getGlobalBounds();
-        }
-
-        void setCol() {
-            boss->setColor(Color::Red);
-        }
-
-        void setNor() {
-            boss->setColor(Color::White);
-        }
-
-        ~Gamakichi() {
-        for(int i = 0; i < 4; i++)
-        delete smokey[i];
-            delete[] smokey;
-            delete boss;
-            boss = nullptr;
-        }
-};
-
-int Gamakichi::bossHp = 1500;
-
-//----------------------GAMAKICHI BOSS END---------------------
+void LoadLevel(int levelNo, Level& level, Texture& bgTex, Sprite& background, Tiles*& tilt, int& tileCount);
 
 struct EnemySpawnPoint { int row; int col; };
+
+
 
 EnemySpawnPoint levelSpawns[10][6] = {
     // Level 1 — platforms at rows 4,5,7,9,11,13
@@ -2079,7 +302,9 @@ void spawnFoogas(Fooga* foogas) {
     float fx = 177.f / 2.f;
     float fy = 180.f / 2.f;
     for (int i = 0; i < 4; i++) {
+        foogas[i].init();
         foogas[i].reset();
+        foogas[i].kill(); // Start inactive — reset() sets alive=true which blocks level completion
     }
     foogas[0].setPos(155.f, 125.f, fx, fy);
     foogas[1].setPos(355.f, 125.f, fx, fy);
@@ -2087,17 +312,19 @@ void spawnFoogas(Fooga* foogas) {
     foogas[3].setPos(555.f, 275.f, fx, fy);
 }
 
-void spawnEnemies(Botom* enemies, int levelNo) {
-    EnemySpawnPoint* spawns = levelSpawns[levelNo - 1];
+void spawnEnemies(Botom enemies[], int levelNo) {
     for (int i = 0; i < 6; i++) {
+        enemies[i].init();
         enemies[i].reset();
-        enemies[i].setPos(spawns[i].row, spawns[i].col);
-        enemies[i].setmv1(rand() % 2 == 0);
+        enemies[i].setPos(levelSpawns[levelNo - 1][i].row, levelSpawns[levelNo - 1][i].col);
     }
 }
 
 int main()
 {
+    // Initializing Random Seed
+    srand(static_cast<unsigned>(time(nullptr)));
+
     RenderWindow window(VideoMode({ 800u, 600u }), "SNOW BROS");
     window.setFramerateLimit(60);
     window.setKeyRepeatEnabled(false);
@@ -2187,6 +414,13 @@ int main()
 
     Player play;
     Player play2;
+
+    string t0 = "Characters/Enemies/nick_0.png";
+    string t1 = "Characters/Enemies/nick_1.png";
+    string t2 = "Characters/Enemies/nick_2.png";
+    string t3 = "Characters/Enemies/nick_3.png";
+    play.init(t0, t1, t2, t3);
+    play2.init(t0, t1, t2, t3);
     const int MAX_ENEMIES = 6;
     Botom enemies[MAX_ENEMIES];
 
@@ -2198,12 +432,17 @@ int main()
     //------------- Foogas ---------------
     int num = 4;
     Fooga fooga[4];
-    spawnEnemies(enemies, levelNo); // already called
     spawnFoogas(fooga);
 
     float vx = 572.f / 2.f;
     float vy = 460.f / 2.f;
     mogera.setPos(650.f, 300.f, vx, vy);
+
+    //-----------GAMAKICHI BOSS-----------------
+    Gamakichi gamakichi;
+    float ux = 1130.f / 2.f;
+    float uy = 620.f / 2.f;
+    gamakichi.setPos(400.f, 500.f, ux, uy);
     window.setFramerateLimit(60);
 
     Font font;
@@ -2706,6 +945,8 @@ int main()
                     levelButtons[i] = FloatRect({ x - 25.f, y - 25.f }, { 50.f, 50.f });
                     if (levelButtons[i].contains(mousePos)) hoveredLevel = i + 1;
                 }
+                FloatRect backBtn({ 321.f, 540.f }, { 477.f - 321.f, 566.f - 540.f });
+                if (backBtn.contains(mousePos)) hoveredLevel = -1;
 
                 while (true) {
                     auto event = window.pollEvent();
@@ -2713,18 +954,22 @@ int main()
                     if (event->is<Event::Closed>()) window.close();
                     
                     if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
-                        if (mousePressed->button == Mouse::Button::Left && hoveredLevel > 0) {
-                            levelNo = hoveredLevel;
-                            LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
-                            spawnEnemies(enemies, levelNo);
-                            spawnFoogas(fooga);
-                            play.setPos(12, 5);
-                            lives = 3;
-                            if (isMultiplayer) {
-                                play2.setPos(12, 7);
-                                lives2 = 3;
+                        if (mousePressed->button == Mouse::Button::Left) {
+                            if (hoveredLevel > 0) {
+                                levelNo = hoveredLevel;
+                                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                                spawnEnemies(enemies, levelNo);
+                                spawnFoogas(fooga);
+                                play.setPos(12, 5);
+                                lives = 3;
+                                if (isMultiplayer) {
+                                    play2.setPos(12, 7);
+                                    lives2 = 3;
+                                }
+                                currentState = GameState::Playing;
+                            } else if (hoveredLevel == -1) {
+                                currentState = GameState::MainMenu;
                             }
-                            currentState = GameState::Playing;
                         }
                     }
 
@@ -2862,7 +1107,7 @@ int main()
                 gemText.setString("GEMS: " + to_string(gems));
                 gemText.setCharacterSize(16);
                 gemText.setFillColor(Color::Yellow);
-                gemText.setPosition({ 600.f,63.f }); // Position based on your coords 581, 388
+                gemText.setPosition({ 601.f, 45.f });
                 window.draw(gemText);
 
                 // Draw Selector snowball on hover
@@ -3028,53 +1273,49 @@ int main()
                 gems += 10;
             }
         }
-        // --- ROLLING KILLS ---
-        // A rolling enemy kills any non-rolling enemy it overlaps
+        // --- ROLLING KILLS (Cross-Enemy Collision) ---
+        // A rolling enemy (Botom or Fooga) kills any non-rolling enemy it overlaps
+        
+        // 1. Check Botoms that are rolling
         for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (!enemies[i].isAlive()) continue;
-            if (!enemies[i].isRolling()) continue;
-
-            for (int j = 0; j < MAX_ENEMIES; j++) {
-                if (i == j) continue;  // don't collide with yourself
-                if (!enemies[j].isAlive()) continue;
-                if (enemies[j].isRolling()) continue;  // two rolling won't kill each other
-
-                if (enemies[i].boun().findIntersection(enemies[j].boun())) {
-                    enemies[j].kill();  // enemy in the path dies
-                    score +=200;
-                    gems+=10;
-                    // The rolling snowball keeps going to kill others in its path
+            if (enemies[i].isAlive() && enemies[i].isRolling()) {
+                // Hits other Botoms
+                for (int j = 0; j < MAX_ENEMIES; j++) {
+                    if (i == j || !enemies[j].isAlive() || enemies[j].isRolling()) continue;
+                    if (enemies[i].boun().findIntersection(enemies[j].boun())) {
+                        enemies[j].kill();
+                        score += 200; gems += 10;
+                    }
+                }
+                // Hits Foogas
+                for (int j = 0; j < 4; j++) {
+                    if (!fooga[j].isAlive() || fooga[j].isRolling()) continue;
+                    if (enemies[i].boun().findIntersection(fooga[j].boun())) {
+                        fooga[j].kill();
+                        score += 200; gems += 10;
+                    }
                 }
             }
         }
-        // FOOGAS!!!!!!!!!
+
+        // 2. Check Foogas that are rolling
         for (int i = 0; i < 4; i++) {
-            if (!fooga[i].isAlive()) continue;
-            if (!fooga[i].isRolling()) continue;
-            for (int j = 0; j < 4; j++) {
-                if (i == j) continue;
-                if (!fooga[j].isAlive()) continue;
-                if (fooga[j].isRolling()) continue;
-                if (fooga[i].boun().findIntersection(fooga[j].boun())) {
-                    fooga[j].kill();
-                    score += 200;
-                    gems += 15;
+            if (fooga[i].isAlive() && fooga[i].isRolling()) {
+                // Hits Botoms
+                for (int j = 0; j < MAX_ENEMIES; j++) {
+                    if (!enemies[j].isAlive() || enemies[j].isRolling()) continue;
+                    if (fooga[i].boun().findIntersection(enemies[j].boun())) {
+                        enemies[j].kill();
+                        score += 200; gems += 10;
+                    }
                 }
-            }
-        }
-
-        //BOTOMS KILLING FOOGAS FRFR
-        for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (!enemies[i].isAlive()) continue;
-            if (!enemies[i].isRolling()) continue;
-            for (int j = 0; j < 4; j++) {
-                if (i == j) continue;
-                if (!fooga[j].isAlive()) continue;
-                if (fooga[j].isRolling()) continue;
-                if (enemies[i].boun().findIntersection(fooga[j].boun())) {
-                    fooga[j].kill();
-                    score += 200;
-                    gems += 15;
+                // Hits other Foogas
+                for (int j = 0; j < 4; j++) {
+                    if (i == j || !fooga[j].isAlive() || fooga[j].isRolling()) continue;
+                    if (fooga[i].boun().findIntersection(fooga[j].boun())) {
+                        fooga[j].kill();
+                        score += 200; gems += 10;
+                    }
                 }
             }
         }
@@ -3148,8 +1389,10 @@ int main()
         mover(MAX_ENEMIES, enemies, tilt, count);
         mover(4, fooga, tilt, count);
         //mover(2, tornado, tilt, count);
-        mogera.movement(tilt, count, play , db, username, lives, gems, score, levelNo);
-        gamakichi.movements(tilt, count, play , db, username, lives, gems, score, levelNo);
+        if (mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo))
+            currentState = GameState::GameOver;
+        if (gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo))
+            currentState = GameState::GameOver;
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
@@ -3188,40 +1431,26 @@ int main()
         Draw(4, fooga, window);
         //Draw(2, tornado, window);
         gamakichi.Draw(window, tilt, count);
-        if(Mogera::bossHp > 0)
-        mogera.Draw(window, tilt, count);
+        if (Mogera::bossHp > 0)
+            mogera.Draw(window, tilt, count);
         //------------MOGERA DYING-------------------------------
-        else if(Mogera::bossHp <= 0 && mogera.getDeath() == true) {
-           mogera.setPos(-999.f,-999.f,0.f,0.f);
-           score += 5000;
-           mogera.setDead();
+        else if (Mogera::bossHp <= 0 && mogera.getDeath() == true) {
+            mogera.setPos(-999.f, -999.f, 0.f, 0.f);
+            score += 5000;
+            mogera.setDead(); // sets isDead=false so this only fires once
         }
-       else
-       score += 0;
-        // Draw frozen overlays on top of enemies
-        for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (!enemies[i].isAlive()) continue;
-            if (enemies[i].isFrozen()) {
-                window.draw(enemies[i].getFrozenOverlay());
-            }
-        }
-        // foogas again ._.
-        for (int i = 0; i < 4; i++) {
-            if (!fooga[i].isAlive()) continue;
-            if (fooga[i].isFrozen()) {
-                window.draw(fooga[i].getFrozenOverlay());
-            }
-        }
+        // Frozen overlays are now handled inside the Draw functions below
+
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
-            snowballs[i].draw(window);
+            snowballs[i].Draw(window);
         }
         if (lives > 0) {
-            window.draw(play.Draw());
+            window.draw(play.getSprite());
         }
         if (isMultiplayer && lives2 > 0) {
             play2.updateInvincibility();
             play2.applyGravity(tilt, count);
-            window.draw(play2.Draw());
+            window.draw(play2.getSprite());
         }
 
         // --- HUD DRAWING ---
@@ -3248,16 +1477,6 @@ int main()
         FloatRect scB = hudText.getGlobalBounds();
         hudText.setPosition({ 100.f - scB.size.x / 2.f, 8.f });
         window.draw(hudText);
-
-        // Segment 2: Stage (200-400)
-        if(!isMultiplayer){
-            hudText.setFillColor(Color::White);
-            hudText.setString("STAGE: " + to_string(levelNo));
-            FloatRect stB = hudText.getGlobalBounds();
-            hudText.setPosition({ 300.f - stB.size.x / 2.f, 8.f });
-            window.draw(hudText);
-        }
-        
 
         // Lives (P1 - Left of Center)
         Sprite heart(heartTex);
@@ -3296,19 +1515,23 @@ int main()
 
         // --- LEVEL COMPLETION CHECK ---
         bool allDead = true;
+        
+        // 1. Check regular enemies
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (enemies[i].isAlive()) { allDead = false; break; }
         }
+        
+        // 2. Check Foogas
         if (allDead) {
             for (int i = 0; i < 4; i++) {
                 if (fooga[i].isAlive()) { allDead = false; break; }
             }
         }
 
+
         if (allDead) {
             levelNo++;
             if (levelNo > 10) {
-                // Game Won!
                 currentState = GameState::Victory;
                 levelNo = 1;
             } else {
@@ -3317,7 +1540,7 @@ int main()
                 spawnEnemies(enemies, levelNo);
                 spawnFoogas(fooga);
                 play.setPos(12, 5);
-                if (isMultiplayer) play2.setPos(12, 7); 
+                if (isMultiplayer) play2.setPos(12, 7);
             }
         }
 
@@ -3437,9 +1660,9 @@ int main()
                     }
                 }
                 for (int i = 0; i < MAX_SNOWBALLS; i++) {
-                    snowballs[i].draw(window);
+                    snowballs[i].Draw(window);
                 }
-                window.draw(play.Draw());
+                window.draw(play.getSprite());
 
                 // 2. Dim overlay (Full Screen)
                 RectangleShape dim({ 800.f, 600.f });
@@ -3608,5 +1831,109 @@ int main()
     return 0;
 }
 
-Texture Snowball::sharedTexture;
-Texture Botom::frozenSharedTexture;
+void LoadLevel(int levelNo, Level& level, Texture& bgTex, Sprite& background, Tiles*& tilt, int& tileCount) {
+    if (levelNo == 10) Mogera::bossHp = 900;
+    if (levelNo == 1) SetupLevel1(level);
+    else if (levelNo == 2) SetupLevel2(level);
+    else if (levelNo == 3) SetupLevel3(level);
+    else if (levelNo == 4) SetupLevel4(level);
+    else if (levelNo == 5) SetupLevel5(level);
+    else if (levelNo == 6) SetupLevel6(level);
+    else if (levelNo == 7) SetupLevel7(level);
+    else if (levelNo == 8) SetupLevel8(level);
+    else if (levelNo == 9) SetupLevel9(level);
+    else if (levelNo == 10) SetupLevel10(level);
+
+    bgTex.loadFromFile(level.backgroundPath);
+    background.setTexture(bgTex, true);
+    if (bgTex.getSize().x > 0) {
+        background.setScale({ 800.f / bgTex.getSize().x, 600.f / bgTex.getSize().y });
+    }
+
+    if (tilt) delete[] tilt;
+    tileCount = 0;
+    for (int r = 0; r < Level::ROWS; r++)
+        for (int c = 0; c < Level::COLS; c++)
+            if (level.grid[r][c] != 0) tileCount++;
+
+    tilt = new Tiles[tileCount];
+    int idx = 0;
+    for (int r = 0; r < Level::ROWS; r++)
+        for (int c = 0; c < Level::COLS; c++)
+            if (level.grid[r][c] != 0) {
+                tilt[idx].setpost(c * Level::TILE_W, r * Level::TILE_H);
+                idx++;
+            }
+}
+
+
+void mover(int n, Botom* other, Tiles* tiles, int tileCount) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive()) other[i].movement(tiles, tileCount);
+    }
+}
+
+void Draw(int n, Botom* other, RenderWindow& window) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive() || other[i].isDying()) {
+            window.draw(other[i].getSprite());
+            if (other[i].isFrozen()) {
+                window.draw(other[i].getFrozenOverlay());
+            }
+        }
+    }
+}
+
+void mover(int n, Fooga* other, Tiles* tiles, int tileCount) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive()) other[i].movement(tiles, tileCount);
+    }
+}
+
+void Draw(int n, Fooga* other, RenderWindow& window) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive() || other[i].isDying()) {
+            window.draw(other[i].getSprite());
+            if (other[i].isFrozen()) {
+                window.draw(other[i].getFrozenOverlay());
+            }
+        }
+    }
+}
+
+void Draw(int n, Tornado* other, RenderWindow& window) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive() || other[i].isDying()) {
+            window.draw(other[i].getSprite());
+            if (other[i].isFrozen()) {
+                window.draw(other[i].getFrozenOverlay());
+            }
+        }
+    }
+}
+
+void mover(int n, Tornado* other, Tiles* tiles, int tileCount) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive()) other[i].movement_spin(tiles, tileCount);
+    }
+}
+
+void Gravity(int n, Botom* other, Tiles* tiles, int c) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive()) other[i].applyGravity(tiles, c);
+    }
+}
+
+void Gravity(int n, Fooga* other, Tiles* tiles, int c) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive()) other[i].applyGravity(tiles, c);
+    }
+}
+
+void Gravity(Tornado* other, int n, Tiles* tiles, int c) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].isAlive()) other[i].applyGravity(tiles, c);
+    }
+}
+
+
