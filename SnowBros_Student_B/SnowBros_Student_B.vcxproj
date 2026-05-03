@@ -140,14 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="src\Entities\Entity.cpp" />
-    <ClCompile Include="src\Entities\Enemy.cpp" />
-    <ClCompile Include="src\Entities\Player.cpp" />
-    <ClCompile Include="src\Entities\Enemies\Botom.cpp" />
-    <ClCompile Include="src\Entities\Enemies\Fooga.cpp" />
-    <ClCompile Include="src\Entities\Enemies\Tornado.cpp" />
-    <ClCompile Include="src\Entities\Enemies\Mogera.cpp" />
-    <ClCompile Include="src\Entities\Projectiles\Snowball.cpp" />
+    <ClCompile Include="src\Enemies\Botom.cpp" />
     <ClCompile Include="src\Levels\LevelData.cpp" />
     <ClCompile Include="src\Maps\TileMap.cpp" />
     <ClCompile Include="src\Systems\AuthManager.cpp" />
@@ -155,6 +148,15 @@
     <ClCompile Include="src\Systems\ShopManager.cpp" />
     <ClCompile Include="src\Systems\ScoreManager.cpp" />
     <ClCompile Include="src\Systems\EventBus.cpp" />
+    <ClCompile Include="src\Enemies\Boss.cpp" />
+    <ClCompile Include="src\Enemies\ColorVariant.cpp" />
+    <ClCompile Include="src\Enemies\FlyingEnemy.cpp" />
+    <ClCompile Include="src\Enemies\FlyingFooga.cpp" />
+    <ClCompile Include="src\Enemies\Gamakichi.cpp" />
+    <ClCompile Include="src\Enemies\Mogera.cpp" />
+    <ClCompile Include="src\Enemies\Tornado.cpp" />
+    <ClCompile Include="src\Enemies\Enemy.cpp" />
+    <ClCompile Include="src\Entities\Entity.cpp" />
     <ClCompile Include="src\Game.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -179,12 +181,18 @@
     <ClInclude Include="FlyingEnemy.h" />
     <ClInclude Include="FlyingFooga.h" />
     <ClInclude Include="Gamakichi.h" />
+    <ClInclude Include="src\Enemies\Botom.h" />
     <ClInclude Include="src\Levels\LevelData.h" />
     <ClInclude Include="src\Maps\TileMap.h" />
     <ClInclude Include="src\Systems\AuthManager.h" />
     <ClInclude Include="src\Systems\ShopManager.h" />
     <ClInclude Include="src\Systems\EventBus.h" />
     <ClInclude Include="ENTITY_TEMPLATE.h" />
+    <ClInclude Include="src\Enemies\Boss.h" />
+    <ClInclude Include="src\Enemies\ColorVariant.h" />
+    <ClInclude Include="src\Enemies\Mogera.h" />
+    <ClInclude Include="src\Enemies\Enemy.h" />
+    <ClInclude Include="src\Enemies\Tornado.h" />
     <ClInclude Include="src\Entities\Entity.h" />
     <ClInclude Include="src\Game.h" />
   </ItemGroup>
