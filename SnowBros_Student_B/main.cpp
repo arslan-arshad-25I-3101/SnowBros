@@ -9,6 +9,8 @@
 using namespace std;
 using namespace sf;
 
+
+
 // Forward declaration for Tiles
 //class Tiles;
 
@@ -243,8 +245,8 @@ public:
                                   frozenFrames[frozenIndex].size.y / 2.f });
         return frozenOverlay;
     }
-    enum GravityState { NORMAL, JUMPING_UP };
-    GravityState currentState = NORMAL;
+    enum GravityState { WALKING, JUMPING_UP };
+    GravityState currentState = WALKING;
     void applyGravity(Tiles* tiles, int tileCount) {
         velocityY += gravity;
         float limit = enemy->getPosition().y + velocityY;
@@ -268,7 +270,7 @@ public:
         }
     }
     void antiGravity(Tiles* tiles, int tileCount) {
-        if (currentState == NORMAL && upCheckCollision(tiles, tileCount)) {
+        if (currentState == WALKING && upCheckCollision(tiles, tileCount)) {
             // Start the jump
             float distance = distanceChecker(tiles, tileCount);
             velocityY = -5.0f;  // Initial jump speed
@@ -284,7 +286,7 @@ public:
             if (upCheckCollision(tiles, tileCount) && velocityY >= 0) {
                 enemy->move({ 0.0f, -velocityY });
                 velocityY = 0.0f;
-                currentState = NORMAL;  // Reset
+                currentState = WALKING;  // Reset
                 onUpper = true;
             }
         }
@@ -297,7 +299,7 @@ public:
         auto bounds = enemy->getGlobalBounds();
         // Check a bit below the enemy's feet
         FloatRect checkArea({ bounds.position.x + 6.f, bounds.position.y + bounds.size.y },
-            { bounds.size.x - 12.f, 2.f }); // 5 pixels below
+            { bounds.size.x - 20.f, 4.f }); // 5 pixels below
 
         for (int i = 0; i < tileCount; i++) {
             if (checkArea.findIntersection(tiles[i].boun())) {
@@ -605,13 +607,261 @@ public:
 
 };
 
+class Tornado : public Fooga {
+protected:
+Texture spin[8];
+int spinFrames = 0;
+public:
+    Tornado() {
+    tex[0].loadFromFile("tornado/tornado_blue_idle.png");
+    tex[1].loadFromFile("tornado/tornado_blue_01.png");
+    tex[2].loadFromFile("tornado/tornado_blue_02.png");
+    tex[3].loadFromFile("tornado/tornado_blue_03.png");
+    tex[4].loadFromFile("tornado/tornado_blue_03.png");
+    tex[5].loadFromFile("tornado/tornado_blue_03.png");
+    enemy->setTexture(tex[0]);
+    spin[0].loadFromFile("tornado/tornado_blue_spin_01.png");
+    spin[1].loadFromFile("tornado/tornado_blue_spin_02.png");
+    spin[2].loadFromFile("tornado/tornado_blue_spin_03.png");
+    spin[3].loadFromFile("tornado/tornado_blue_spin_04.png");
+    spin[4].loadFromFile("tornado/tornado_blue_spin_05.png");
+    spin[5].loadFromFile("tornado/tornado_blue_spin_06.png");
+    spin[6].loadFromFile("tornado/tornado_blue_spin_07.png");
+    spin[7].loadFromFile("tornado/tornado_blue_spin_08.png");
+
+   
+}
+    //enum MovingState { NORMAL, SPINNING };
+    //MovingState currentState = SPINNING;
+    void movement_spin(Tiles* tiles, int tileCount) {
+        if (!alive || dying) return;
+        if (rolling) {
+            // Timeout: after 3 seconds of rolling, the snowball breaks
+            if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
+                kill();
+                return;
+            }
+
+            // Gravity still applies while rolling
+            velocityY += gravity;
+            enemy->move({ 0.f, velocityY });
+
+            if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
+                enemy->move({ 0.f, -velocityY });
+                velocityY = 0.f;
+            }
+
+            // Move horizontally at high speed
+            enemy->move({ rollingVelocityX, 0.f });
+
+            // Screen wrap or break (classic Snow Bros behavior)
+            auto pos = enemy->getPosition();
+            if (pos.y > 500.f) {
+                // On the bottom floor, the rolling snowball breaks when going off-screen
+                if (pos.x > 800.f || pos.x < 0.f) {
+                    kill();
+                }
+            }
+            else {
+                // On higher floors, it wraps around
+                if (pos.x > 800.f) enemy->setPosition({ 0.f, pos.y });
+                if (pos.x < 0.f)   enemy->setPosition({ 800.f, pos.y });
+            }
+
+            return; // skip normal walking logic
+        }
+        if (frozen) return;
+      
+        if (mv1 == true && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
+            velocity_X -= 0.0625f;
+            velocityY = velocityY;
+            enemy->move({ -speed, -velocityY + speed });
+            enemy->setScale({ 131.f / 325.f,122.f / 325.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (spinFrames)++;
+                if (spinFrames >= 8)
+                    spinFrames = 4;
+                enemy->setTexture(spin[spinFrames]);
+                clocks.restart();
+                //currentState = NORMAL;
+            }
+        }
+        else if (mv1 == false && (enemy->getPosition().y <= 550 && enemy->getPosition().y >= 35)) {
+            velocity_X -= 0.0625f;
+            velocityY = velocityY;
+            enemy->move({ +speed, +velocityY });
+            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (spinFrames)++;
+                if (spinFrames >= 8)
+                    spinFrames = 4;
+                enemy->setTexture(spin[spinFrames]);
+                clocks.restart();
+               // currentState = NORMAL;
+            }
+        }
+        else if (enemy->getPosition().y < 25.f) {
+            velocity_X += 0.0625f;
+            velocityY += 0.75f;
+            enemy->move({ speed, velocityY });
+            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (spinFrames)++;
+                if (spinFrames >= 8)
+                    spinFrames = 4;
+                enemy->setTexture(spin[spinFrames]);
+                clocks.restart();
+                //currentState = NORMAL;
+            }
+        }
+
+        else {
+            velocity_X -= 0.0625f;
+            velocityY -= 0.5f;
+            enemy->move({ speed, velocityY });
+            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (spinFrames)++;
+                if (spinFrames >= 8)
+                    spinFrames = 4;
+                enemy->setTexture(spin[spinFrames]);
+                clocks.restart();
+                //currentState = NORMAL;
+            }
+        }
+        if (enemy->getPosition().x >= 725 && enemy->getPosition().x <= 800) {
+            mv1 = true;
+            enemy->setTexture(tex[3]);
+            pausef = 60;
+            velocity_X -= 0.0625f;
+            velocityY = -velocityY;
+
+
+        }
+        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
+            mv1 = false;
+            enemy->setTexture(tex[3]);
+            pausef = 60;
+            velocity_X += 0.0625f;
+            velocityY = -velocityY;
+        }
+        if (enemy->getPosition().y >= 0 && enemy->getPosition().y <= 15) {
+            mv1 = false;
+            enemy->setTexture(tex[1]);
+            pausef = 60;
+            velocity_X += 0.0625;
+            velocityY = velocityY;
+        }
+        if (enemy->getPosition().y >= 550 && enemy->getPosition().y <= 600) {
+            mv1 = false;
+            enemy->setTexture(tex[1]);
+            pausef = 60;
+            velocity_X -= 0.25f;
+            velocityY -= 0.5f;
+        }
+        if (enemy->getPosition().x <= 0 && enemy->getPosition().y <= 0) {
+            mv1 = false;
+            enemy->setTexture(tex[1]);
+            pausef = 60;
+            velocity_X += 0.0625;
+            velocityY = -velocityY;
+        }
+    }
+    void movement_normal(Tiles* tiles, int tileCount) {
+        if (!alive || dying) return;  // dead/dying enemies do nothing
+        if (enemy->getPosition().y > 650.f) {
+            kill();
+            return;
+        }
+        // --- ROLLING STATE: fast horizontal movement with gravity ---
+        if (rolling) {
+            // Timeout: after 3 seconds of rolling, the snowball breaks
+            if (rollingClock.getElapsedTime().asSeconds() > 3.f) {
+                kill();
+                return;
+            }
+
+            // Gravity still applies while rolling
+            velocityY += gravity;
+            enemy->move({ 0.f, velocityY });
+
+            if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
+                enemy->move({ 0.f, -velocityY });
+                velocityY = 0.f;
+            }
+
+            // Move horizontally at high speed
+            enemy->move({ rollingVelocityX, 0.f });
+
+            // Screen wrap or break (classic Snow Bros behavior)
+            auto pos = enemy->getPosition();
+            if (pos.y > 500.f) {
+                // On the bottom floor, the rolling snowball breaks when going off-screen
+                if (pos.x > 800.f || pos.x < 0.f) {
+                    kill();
+                }
+            }
+            else {
+                // On higher floors, it wraps around
+                if (pos.x > 800.f) enemy->setPosition({ 0.f, pos.y });
+                if (pos.x < 0.f)   enemy->setPosition({ 800.f, pos.y });
+            }
+
+            return; // skip normal walking logic
+        }
+        if (frozen) return;
+
+        //functiosn related to botom movement start from here
+        if (mv1 == true) {
+            enemy->move({ -speed, -0.0f });
+            enemy->setScale({ 131.f / 325.f,122.f / 325.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (frames)++;
+                if (frames >= 4)
+                    frames = 1;
+                //enemy->setTextureRect(walkFrames[frames]);
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
+                //currentState = SPINNING;
+            }
+        }
+        else if (mv1 == false) {
+            enemy->move({ +speed, -0.0f });
+            enemy->setScale({ -131.f / 325.f,122.f / 325.f });
+            if ((clocks.getElapsedTime().asSeconds()) > frametime) {
+                (frames)++;
+                if (frames >= 4)
+                    frames = 1;
+                //enemy->setTextureRect(walkFrames[frames]);
+                enemy->setTexture(tex[frames]);
+                clocks.restart();
+                //currentState = SPINNING;
+            }
+        }
+
+
+        if (enemy->getPosition().x >= 750 && enemy->getPosition().x <= 800) {
+            mv1 = true;
+            //enemy->setTextureRect(walkFrames[2]);
+            enemy->setTexture(tex[3]);
+            pausef = 60;
+        }
+        if (enemy->getPosition().x >= 0 && enemy->getPosition().x <= 50) {
+            mv1 = false;
+            //enemy->setTextureRect(walkFrames[2]);
+            enemy->setTexture(tex[3]);
+            pausef = 60;
+        }
+
+    }
+};
+
 void mover(int n, Botom* other, Tiles* tiles, int tileCount) {
     for (int i = 0; i < n; i++) {
         if (!other[i].isAlive()) continue;  // skip dead
         other[i].movement(tiles, tileCount);
     }
 }
-
 
 void Draw(int n, Botom* other, RenderWindow& window) {
     for (int i = 0; i < n; i++) {
@@ -629,6 +879,23 @@ void Draw(int n, Fooga* other, RenderWindow& window) {
     for (int i = 0; i < n; i++) {
         if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
         window.draw(other[i].getEnemy());
+    }
+}
+
+void Draw(int n, Tornado* other, RenderWindow& window) {
+    for (int i = 0; i < n; i++) {
+        if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
+        window.draw(other[i].getEnemy());
+    }
+}
+
+void mover(int n, Tornado* other, Tiles* tiles, int tileCount) {
+    for (int i = 0; i < n; i++) {
+        int r = rand()%50;
+        if(r != 1)
+        other[i].movement_normal(tiles, tileCount);
+        else if( r == 1)
+        other[i].movement_spin(tiles, tileCount);
     }
 }
 
@@ -671,6 +938,28 @@ void Gravity(int n, Fooga* other, Tiles* tiles, int c) {
             bool isTile = other[i].checkTileBelow(tiles, c);
             if (!isTile) {
                 other[i].applyGravity(tiles, c);
+            }
+        }
+    }
+}
+
+void Gravity(Tornado* other, int n, Tiles* tiles, int c) {
+    for (int i = 0; i < n; i++) {
+        if (other[i].currentState == Tornado::JUMPING_UP) {
+            other[i].antiGravity(tiles, c);
+        }
+        else {
+            bool isTile = other[i].checkTileBelow(tiles, c);
+            if (!isTile) {
+                other[i].applyGravity(tiles, c);
+            }
+            else {
+                int x = rand() % 50;
+                if (x == 1)
+                    other[i].antiGravity(tiles, c);
+                else if(x == 2)
+                    other[i].applyGravity(tiles, c);
+
             }
         }
     }
@@ -842,6 +1131,8 @@ bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileC
     return false;
 }
 
+
+
 //////////////////////////////// SNOWBALL end //////////////////////////////////////
 
 class Player : public Botom {
@@ -1001,6 +1292,359 @@ void LoadLevel(
 
 ///////////////////////////////////// LEVEL LOADING END ////////////////////////////////////
 
+//---------------------------------MOGERAS SON JOHNs -----------------------------------
+
+class MogeraChild {
+protected:
+    Sprite* spawn;
+    Texture text[7];
+    int currentFrame = 0;
+    float frametime = 0.1f;
+    Clock animClock;
+    bool active = true;
+    bool isJump;
+    bool unUpper;
+    bool onGround = false;
+    float velocityY = 0.0f;
+    float gravity = 0.5f;
+    bool checkCollision(Tiles* tiles, int tileCount) {
+        auto bounds = spawn->getGlobalBounds();
+        FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
+            { bounds.size.x - 6.f, bounds.size.y - 12.f });
+
+        for (int i = 0; i < tileCount; i++) {
+            if (hitbox.findIntersection(tiles[i].boun())) {
+                return true;
+            }
+        }
+        return false;
+    }
+public:
+    MogeraChild() {
+        text[0].loadFromFile("spawn/spawn_01.png");
+        text[1].loadFromFile("spawn/spawn_02.png");
+        text[2].loadFromFile("spawn/spawn_03.png");
+        text[3].loadFromFile("spawn/spawn_04.png");
+        text[4].loadFromFile("spawn/spawn_05.png");
+        text[5].loadFromFile("spawn/spawn_06.png");
+        text[6].loadFromFile("spawn/spawn_07.png");
+        spawn = new Sprite(text[0]);
+    }
+    MogeraChild(const MogeraChild& other) {
+        for (int i = 0; i < 7; i++) {
+            text[i] = other.text[i];
+        }
+        spawn = new Sprite(text[other.currentFrame]);
+        spawn->setPosition(other.spawn->getPosition());
+        spawn->setOrigin(other.spawn->getOrigin());
+        spawn->setScale(other.spawn->getScale());
+
+        currentFrame = other.currentFrame;
+        frametime = other.frametime;
+        active = other.active;
+        animClock = other.animClock;
+    }
+    MogeraChild& operator=(const MogeraChild& other) {
+        if (this != &other) {
+            delete spawn;
+            for (int i = 0; i < 7; i++) {
+                text[i] = other.text[i];
+            }
+            spawn = new Sprite(text[other.currentFrame]);
+            spawn->setPosition(other.spawn->getPosition());
+            spawn->setOrigin(other.spawn->getOrigin());
+            spawn->setScale(other.spawn->getScale());
+
+            currentFrame = other.currentFrame;
+            frametime = other.frametime;
+            active = other.active;
+            animClock = other.animClock;
+        }
+        return *this;
+    }
+    void setPos(float x, float y, float w = 186.f, float h = 170.f) {
+        spawn->setOrigin({ w, h });
+        spawn->setPosition({ x, y });
+    }
+    enum GravityState { WALKING, JUMPING_UP };
+    GravityState currentState = WALKING;
+    void applyGravity(Tiles* tiles, int tileCount) {
+        velocityY += gravity;
+        float limit = spawn->getPosition().y + velocityY;
+        if (limit < 15.f) {
+            velocityY = 15.f - spawn->getPosition().y;
+        }
+        spawn->move({ 0.f, velocityY });
+
+        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
+            spawn->move({ 0.f, -velocityY });
+            velocityY = 0.f;
+            onGround = true;
+            isJump = false;
+        }
+        else {
+            onGround = false;
+            if (velocityY < 0){
+                if (animClock.getElapsedTime().asSeconds() > frametime) {
+                    currentFrame++;
+                    if (currentFrame >= 7)
+                        currentFrame = 5;
+                    spawn->setTexture(text[currentFrame]);
+                    animClock.restart();
+                }
+              }
+            else {
+                if (animClock.getElapsedTime().asSeconds() > frametime) {
+                    currentFrame++;
+                    if (currentFrame >= 7)
+                        currentFrame = 5;
+                    spawn->setTexture(text[currentFrame]);
+                    animClock.restart();
+                }
+            }
+                
+        }
+    }
+    void movement() {
+    spawn->setScale({186.f/725.f, 170.f/690.f});
+        spawn->move({ -1.5f, 0.0f });
+
+        if (animClock.getElapsedTime().asSeconds() > frametime) {
+            currentFrame++;
+            if (currentFrame >= 7)
+                currentFrame = 0;
+            spawn->setTexture(text[currentFrame]);
+            animClock.restart();
+        }
+
+        if (spawn->getPosition().x > 750.f || spawn->getPosition().y > 550.f || spawn->getPosition().x <= 80.f) {
+            active = false;
+        }
+    }
+
+    bool isActive() {
+        return active;
+    }
+
+    void Draw(RenderWindow& window) {
+        if (active) {
+            window.draw(*spawn);
+        }
+    }
+
+    ~MogeraChild() {
+        delete spawn;
+        spawn = nullptr;
+    }
+};
+
+
+void vectora(MogeraChild*& a, int* n, MogeraChild v) {
+    *n += 1;
+    MogeraChild* arr = new MogeraChild[*n];
+    for (int i = 0; i < *n; i++) {
+        if (i < *n - 1)
+            arr[i] = a[i];
+        else
+            arr[i] = v;
+    }
+    delete[] a;
+    a = nullptr;
+    a = arr;
+}
+
+//------------------------------------MOGERA BOSS-------------------------
+
+class Mogera {
+protected:
+    Sprite* bossChest;
+    Sprite* bossLeg;
+    Texture bodyText[3];
+    Texture legText[3];
+    int bodyFrames = 0;
+    int legFrames = 0;
+    float frametime = 0.15f;
+    Clock clock;
+
+   
+    MogeraChild* spawns;
+    int spawnCount;
+    Clock spawnClock;
+    float spawnInterval = 3.0f;  
+    bool isDead = false;
+
+public:
+static int bossHp;
+    Mogera() {
+        bodyText[0].loadFromFile("mogera/mogera_01.png");
+        bodyText[1].loadFromFile("mogera/mogera_02.png");
+        bodyText[2].loadFromFile("mogera/mogera_03.png");
+        legText[0].loadFromFile("mogera/mogera_leg_01.png");
+        legText[1].loadFromFile("mogera/mogera_leg_02.png");
+        legText[2].loadFromFile("mogera/mogera_leg_03.png");
+        bossChest = new Sprite(bodyText[0]);
+        bossLeg = new Sprite(legText[0]);
+
+        // Initialize spawn array
+        spawns = nullptr;
+        spawnCount = 0;
+    }
+
+    void movement(Tiles* tiles, int tileCount) {
+        int x = rand() % 10;
+        if (x == 1) {
+            bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
+            bossLeg->setScale({ 504.f / 1000.f, 118.f / 254.f });
+            bossChest->move({ 0.0f, 0.0f });
+            bossLeg->move({ 0.0f, 0.0f });
+
+            if (clock.getElapsedTime().asSeconds() > frametime) {
+                bodyFrames++;
+                if (bodyFrames >= 3)
+                    bodyFrames = 0;
+                bossChest->setTexture(bodyText[bodyFrames]);
+                bossLeg->setTexture(legText[bodyFrames]);
+                clock.restart();
+            }
+        }
+
+        if (bossLeg->getPosition().y >= 550.f) {
+            bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
+            bossLeg->setScale({ 504.f / 1000.f, 118.f / 254.f });
+            bossChest->move({ 0.0f, 0.0f });
+            bossLeg->move({ 0.0f, 0.0f });
+
+            if (clock.getElapsedTime().asSeconds() > frametime) {
+                bodyFrames++;
+                if (bodyFrames >= 3)
+                    bodyFrames = 0;
+                bossChest->setTexture(bodyText[bodyFrames]);
+                bossLeg->setTexture(legText[bodyFrames]);
+                clock.restart();
+            }
+        }
+
+       
+        if (spawnClock.getElapsedTime().asSeconds() > spawnInterval) {
+            spawnEnemy();
+            spawnClock.restart();
+        }
+
+       
+        for (int i = 0; i < spawnCount; i++) {
+        spawns[i].applyGravity(tiles, tileCount);
+            spawns[i].movement();
+        }
+
+       
+        cleanupInactiveSpawns();
+    }
+
+    void spawnEnemy() {
+        MogeraChild newSpawn;
+        float y = 0.0f;
+        int r = rand()%3;
+        if(r == 0)
+        y += 0.0f;
+        if(r == 1)
+        y += 42.85f*2;
+        if(r == 2)
+        y += 42.85f*4;
+        newSpawn.setPos(bossChest->getPosition().x, bossChest->getPosition().y+y);
+        vectora(spawns, &spawnCount, newSpawn);
+    }
+
+    void cleanupInactiveSpawns() {
+        // Count active spawns
+        int activeCount = 0;
+        for (int i = 0; i < spawnCount; i++) {
+            if (spawns[i].isActive()) {
+                activeCount++;
+            }
+        }
+
+        // If all are active, no cleanup needed
+        if (activeCount == spawnCount) return;
+
+        // Create new array with only active spawns
+        MogeraChild* newSpawns = new MogeraChild[activeCount];
+        int index = 0;
+        for (int i = 0; i < spawnCount; i++) {
+            if (spawns[i].isActive()) {
+                newSpawns[index] = spawns[i];
+                index++;
+            }
+        }
+
+        delete[] spawns;
+        spawns = newSpawns;
+        spawnCount = activeCount;
+    }
+
+    void setPos(float x, float y, float xx, float yy) {
+        bossChest->setOrigin({ xx, yy });
+        bossLeg->setOrigin({ xx, yy });
+        bossChest->setPosition({ x, y });
+        bossLeg->setPosition({ x, y + 205.7f });
+    }
+
+    void Draw(RenderWindow& window, Tiles* tiles, int tileCount) {
+        window.draw(*bossChest);
+        window.draw(*bossLeg);
+
+        // Draw all spawns
+        for (int i = 0; i < spawnCount; i++) {
+            spawns[i].Draw(window);
+        }
+    }
+
+    FloatRect boun() {
+        return bossChest->getGlobalBounds();
+    }
+
+    void setCol() {
+        bossChest->setColor(Color::Red);
+    }
+
+    void setNor() {
+        bossChest->setColor(Color::White);
+    }
+
+    void checkdead() {
+        if(bossHp <= 0)
+        isDead = true;
+    }
+
+    bool getDeath() {
+        return isDead;
+    }
+
+    ~Mogera() {
+        delete bossChest;
+        delete bossLeg;
+        bossChest = nullptr;
+        bossLeg = nullptr;
+        delete[] spawns;
+        spawns = nullptr;
+    }
+};
+
+int Mogera::bossHp = 900;
+
+bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
+    if (!snowball.active) return false;
+    // No isFrozen() guard — additional hits stack more ice layers
+
+    if (snowball.getBounds().findIntersection(boss.boun())) {
+        boss.setCol();
+        Mogera::bossHp--;
+        return true;
+    }
+
+    return false;
+}
+//-----------------------------------MOGERA BOSS END--------------------------
+
 struct EnemySpawnPoint { int row; int col; };
 
 EnemySpawnPoint levelSpawns[10][6] = {
@@ -1038,9 +1682,6 @@ void spawnEnemies(Botom* enemies, int levelNo) {
 
 int main()
 {
-    //cout << "How many botoms do you want to create? ";
-    //int opt;
-    //cin >> opt;
     RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
 
     Level currentLevel;
@@ -1061,18 +1702,6 @@ int main()
     Snowball snowballs[MAX_SNOWBALLS];
     play.setPos(12, 5);
 
-    //-----------------Ugly mfs-------------------
-    //Botom* botom = new Botom[opt];
-    //float x = 97.f / 2.f;
-    //float y = 89.f / 2.f;
-    //setPos(x, y, opt, botom);
-    //botom[0].setPos(155.f, 125.f, x, y);
-    //botom[1].setPos(355.f, 125.f, x, y);
-    //botom[2].setPos(155.f, 275.f, x, y);
-    //botom[3].setPos(555.f, 275.f, x, y);
-    //botom[4].setPos(400.f, 365.f, x, y);
-    //for(int i = 0; i < opt; i++)
-    //botom[i].setScale(151.f, 151.f);
 
     //------------- Foogas ---------------
     int num = 4;
@@ -1083,6 +1712,22 @@ int main()
     fooga[1].setPos(355.f, 125.f, fx, fy);
     fooga[2].setPos(155.f, 275.f, fx, fy);
     fooga[3].setPos(555.f, 275.f, fx, fy);
+
+    //--------------------Tornadoes------------------
+    int numb = 2;
+    Tornado tornado[2];
+    float fxx = 131.f/2.f;
+    float fyy = 122.f/2.f;
+    tornado[0].setPos(355.f, 150.f, fxx, fyy);
+    tornado[1].setPos(355.f, 250.f, fxx, fyy);
+
+    //-----------------BOSS MOGERA CHECKING-------------------
+    Mogera mogera;
+    float vx = 572.f/2.f;
+    float vy = 460.f/2.f;
+    mogera.setPos(650.f,300.f,vx,vy);
+
+
     window.setFramerateLimit(60);
 
     while (window.isOpen())
@@ -1132,8 +1777,10 @@ int main()
         }
 
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
-            if (!snowballs[i].active)
+            if (!snowballs[i].active){
+            mogera.setNor();
                 continue;
+                }
 
             for (int j = 0; j < MAX_ENEMIES; j++) { // checking for collision between snowball and enemy
                 if (!enemies[j].isAlive()) continue;
@@ -1156,6 +1803,14 @@ int main()
                 }
             }
         }
+
+        //FOR MOGERA
+        for (int i = 0; i < MAX_SNOWBALLS; i++) {
+            if(!snowballs[i].active)
+            continue;
+            snowballHitsMogera(snowballs[i], mogera);
+        }
+
         /// are all enemies dead? if yes, next level
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (enemies[i].isAlive() || enemies[i].isDying()) {
@@ -1247,9 +1902,13 @@ int main()
         // Move all enemies with gravity and tile collision
         mover(MAX_ENEMIES, enemies, tilt, count);
         mover(4, fooga, tilt, count);
+        mover(2, tornado, tilt, count);
+        mogera.movement(tilt, count);
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
+        Gravity(tornado, 2, tilt, count);
+        //Gravity(&mogera, 1, tilt, count);
         // Update frozen state for all enemies (animate overlay, check unfreeze timer)
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (!enemies[i].isAlive()) continue;
@@ -1281,6 +1940,13 @@ int main()
         //Draw(MAX_ENEMIES, enemies, window);
         Draw(MAX_ENEMIES, enemies, window);
         Draw(4, fooga, window);
+        Draw(2, tornado, window);
+        if(Mogera::bossHp > 0)
+        mogera.Draw(window, tilt, count);
+        //------------MOGERA DYING-------------------------------
+        else {
+           mogera.setPos(-999.f,-999.f,0.f,0.f);
+        }
         // Draw frozen overlays on top of enemies
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (!enemies[i].isAlive()) continue;
@@ -1304,9 +1970,7 @@ int main()
     }
 
     delete[] tilt;
-    //delete[] botom;
     tilt = nullptr;
-    //botom = nullptr;
     return 0;
 }
 
