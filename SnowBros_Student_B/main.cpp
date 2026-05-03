@@ -19,30 +19,24 @@ class Item {
 private:
     Sprite* itemSprite;
     Texture tex;
-    enum ItemType { SHOES, ARROW , HEALTH, SPEED_BOOST };
-    ItemType type;
     bool collected = false;
-    Clock lifespanClock;
-    float maxLifespan = 10.f; // disappears after 10s
 
 public:
+    enum ItemType { SHOES, ARROW, HEALTH, SPEED_BOOST };
+    ItemType type;
     Item(ItemType t, float x, float y) {
         type = t;
         // Load texture based on type
-        if (type == SHOES) tex.loadFromFile("coin.png");
-        else if (type == ARROW) tex.loadFromFile("powerup.png");
-        // etc...
+        if (type == SHOES) tex.loadFromFile("items/shoes.png");
+        else if (type == ARROW) tex.loadFromFile("items/arrow.png");
 
         itemSprite = new Sprite(tex);
-        itemSprite->setPosition({x,y});
-        lifespanClock.restart();
-    }
-
-    bool shouldRemove() {
-        return collected || lifespanClock.getElapsedTime().asSeconds() > maxLifespan;
+        itemSprite->setPosition({ x,y });
     }
 
     bool checkPlayerCollision(FloatRect playerBounds) {
+        if (collected) return false;  // Already collected, skip
+
         if (itemSprite->getGlobalBounds().findIntersection(playerBounds)) {
             collected = true;
             return true;
@@ -51,9 +45,24 @@ public:
     }
 
     ItemType getType() { return type; }
-    Sprite getSprite() { return *itemSprite; }
 
-    ~Item() { delete itemSprite; }
+    Sprite getSprite() {
+        if (collected) {
+            // Return offscreen sprite if collected
+            Sprite empty(tex);
+            empty.setPosition({ -999.f, -999.f });
+            return empty;
+        }
+        itemSprite->setScale({200.f/550.f,271.f/730.f});
+        return *itemSprite;
+    }
+
+    bool isCollected() { return collected; }
+
+    ~Item() {
+        delete itemSprite;
+        itemSprite = nullptr;
+    }
 };
 
 // Global Power-up states
@@ -135,6 +144,11 @@ protected:
     bool dying = false;          // brief shrink animation before truly dead
     Clock dyingClock;            // timer for death animation
 
+    Vector2f dropPosition;
+    bool shouldDropItem = false;
+    Item* droppedItem = nullptr;
+    bool itemTransferred = false;
+
     //for checking gravity like falling
     bool checkCollision(Tiles* tiles, int tileCount) {
         auto bounds = enemy->getGlobalBounds();
@@ -199,7 +213,13 @@ public:
 
         frozenIndex = 0;
     }
-
+    bool hasItemToDrop() {
+        return shouldDropItem;
+    }
+    Vector2f getDropPosition() {
+        shouldDropItem = false;  // Reset after getting position
+        return dropPosition;
+    }
     float distanceChecker(Tiles* tiles, int tileCount) {
         auto bounds = enemy->getGlobalBounds();
         FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
@@ -267,6 +287,47 @@ public:
         // Stop all other behavior
         frozen = false;
         rolling = false;
+
+        if (droppedItem == nullptr) {  // Only drop once
+            droppedItem = dropPowerUp(enemy->getPosition().x, enemy->getPosition().y);
+        }
+    }
+    void updateItem(FloatRect playerBounds, bool& hasSpeedBoost, bool& hasDistanceIncrease) {
+        if (droppedItem != nullptr && !itemTransferred) {
+            // Check if already collected
+            if (droppedItem->isCollected()) {
+                delete droppedItem;
+                droppedItem = nullptr;
+                return;
+            }
+
+            // Check player collision
+            if (droppedItem->checkPlayerCollision(playerBounds)) {
+                // Apply power-up based on type
+                if (droppedItem->getType() == Item::SHOES) {
+                    hasSpeedBoost = true;
+                }
+                else if (droppedItem->getType() == Item::ARROW) {
+                    hasDistanceIncrease = true;
+                }
+
+                delete droppedItem;
+                droppedItem = nullptr;
+            }
+        }
+    }
+    Item* transferItem() {
+        if (droppedItem != nullptr && !itemTransferred) {
+            itemTransferred = true;
+            return droppedItem;  // Give it away, don't delete
+        }
+        return nullptr;
+    }
+    void drawItem(RenderWindow& window) {
+        if (droppedItem != nullptr) {
+       
+            window.draw(droppedItem->getSprite());
+        }
     }
     void updateDying() {
         if (!dying) return;
@@ -368,8 +429,27 @@ public:
         }
         return false;
     }
+    Item* dropPowerUp(float x, float y) {
+        // Random chance to drop (e.g., 30% drop rate)
+        if (rand() % 100 < 99) {
+            // Randomly select power-up type
+            int randomType = rand() % 2;
+            Item::ItemType type;
+
+            switch (randomType) {
+            case 0: type = Item::SHOES; break;
+            case 1: type = Item::ARROW; break;
+            //case 2: type = Item::HEALTH; break;
+            //case 3: type = Item::SPEED_BOOST; break;
+            }
+
+            return new Item(type, x, y);
+        }
+        return nullptr; // No drop
+    }
     void movement(Tiles* tiles, int tileCount) {
-        if (!alive || dying) return;  // dead/dying enemies do nothing
+        if (!alive || dying) return; 
+        // dead/dying enemies do nothing
         if (enemy->getPosition().y > 650.f) {
             kill();
             return;
@@ -510,6 +590,10 @@ public:
     ~Botom() {
         delete enemy;
         enemy = nullptr;
+        if (droppedItem != nullptr) {
+            delete droppedItem;
+            droppedItem = nullptr;
+        }
     }
 };
 
@@ -927,6 +1011,7 @@ void Draw(int n, Botom* other, RenderWindow& window) {
     for (int i = 0; i < n; i++) {
         if (!other[i].isAlive() && !other[i].isDying()) continue;  // skip fully dead, but draw dying (shrink anim)
         window.draw(other[i].getEnemy());
+        other[i].drawItem(window);
     }
 }
 
@@ -1758,6 +1843,39 @@ bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
 }
 //-----------------------------------MOGERA BOSS END--------------------------
 
+void addItem(Item**& itemArray, int& itemCount, Item* newItem) {
+    itemCount += 1;
+    Item** newArray = new Item * [itemCount];
+
+    for (int i = 0; i < itemCount; i++) {
+        if (i < itemCount - 1)
+            newArray[i] = itemArray[i];
+        else
+            newArray[i] = newItem;
+    }
+
+    delete[] itemArray;
+    itemArray = newArray;
+}
+
+void removeItem(Item**& itemArray, int& itemCount, int index) {
+    if (itemCount == 0) return;
+
+    Item** newArray = new Item * [itemCount - 1];
+    int newIndex = 0;
+
+    for (int i = 0; i < itemCount; i++) {
+        if (i != index) {
+            newArray[newIndex] = itemArray[i];
+            newIndex++;
+        }
+    }
+
+    delete[] itemArray;
+    itemArray = newArray;
+    itemCount -= 1;
+}
+
 //------------------------GAMAKICHI BOSS-----------------------------------
 
 class Bomb : public MogeraChild {
@@ -2178,6 +2296,9 @@ void spawnEnemies(Botom* enemies, int levelNo) {
 
 int main()
 {
+    Item** worldItems = nullptr;  // Array of Item pointers
+    int itemCount = 0;
+
     RenderWindow window(VideoMode({ 800u, 600u }), "SNOW BROS");
     window.setFramerateLimit(60);
     window.setKeyRepeatEnabled(false);
@@ -3258,6 +3379,48 @@ int main()
         for (int i = 0; i < 4; i++) {
             fooga[i].updateDying();
         }
+
+        FloatRect playerBounds = play.boun();
+
+        // Transfer items from dying enemies to world
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            Item* transferred = enemies[i].transferItem();
+            if (transferred != nullptr) {
+                addItem(worldItems, itemCount, transferred);
+            }
+            // Let enemy check its own item collision
+            enemies[i].updateItem(playerBounds, hasSpeedBoost, hasDistanceIncrease);
+        }
+
+        // Same for foogas
+        for (int i = 0; i < 4; i++) {
+            Item* transferred = fooga[i].transferItem();
+            if (transferred != nullptr) {
+                addItem(worldItems, itemCount, transferred);
+            }
+            fooga[i].updateItem(playerBounds, hasSpeedBoost, hasDistanceIncrease);
+        }
+
+        // Check world items collision
+        for (int i = 0; i < itemCount; i++) {
+            if (worldItems[i]->checkPlayerCollision(playerBounds)) {
+                if (worldItems[i]->getType() == Item::SHOES) {
+                    hasSpeedBoost = true;
+                    play.setSpeed(4.0f);  // Boost speed
+                    if (isMultiplayer) play2.setSpeed(4.0f);
+                    cout << "Speed Boost Collected!" << endl;
+                }
+                else if (worldItems[i]->getType() == Item::ARROW) {
+                    hasDistanceIncrease = true;
+                    cout << "Arrow Power Collected!" << endl;
+                }
+
+                delete worldItems[i];
+                removeItem(worldItems, itemCount, i);
+                i--;
+            }
+        }
+
         play.applyGravity(tilt, count);
 
         window.clear(Color::Black);
@@ -3272,6 +3435,12 @@ int main()
         Draw(4, fooga, window);
         //Draw(2, tornado, window);
         gamakichi.Draw(window, tilt, count);
+        // --- DRAW WORLD ITEMS ---
+        for (int i = 0; i < itemCount; i++) {
+            window.draw(worldItems[i]->getSprite());
+        }
+        // --- END DRAW ITEMS ---
+
         if(Mogera::bossHp > 0)
         mogera.Draw(window, tilt, count);
         //------------MOGERA DYING-------------------------------
@@ -3688,6 +3857,10 @@ int main()
 
     delete[] tilt;
     tilt = nullptr;
+    for (int i = 0; i < itemCount; i++) {
+        delete worldItems[i];
+    }
+    delete[] worldItems;
     return 0;
 }
 
