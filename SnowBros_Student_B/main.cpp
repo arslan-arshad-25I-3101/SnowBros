@@ -286,7 +286,7 @@ public:
         }
     }
     void antiGravity(Tiles* tiles, int tileCount) {
-        if (currentState == WALKING && upCheckCollision(tiles, tileCount)) {
+        if (currentState == NORMAL && upCheckCollision(tiles, tileCount)) {
             // Start the jump
             float distance = distanceChecker(tiles, tileCount);
             velocityY = -5.0f;  // Initial jump speed
@@ -302,7 +302,7 @@ public:
             if (upCheckCollision(tiles, tileCount) && velocityY >= 0) {
                 enemy->move({ 0.0f, -velocityY });
                 velocityY = 0.0f;
-                currentState = WALKING;  // Reset
+                currentState = NORMAL;  // Reset
                 onUpper = true;
             }
         }
@@ -1780,7 +1780,10 @@ switch(choice){
         // Fallback or error handling could go here
     }
 
-    
+    Mogera mogera;
+    float vx = 572.f/2.f;
+    float vy = 460.f/2.f;
+    mogera.setPos(650.f, 300.f, vx, vy);
 
     Text title(font);  // Pass font here
 Text prompt(font); // Pass font here
@@ -2292,12 +2295,12 @@ Text prompt(font); // Pass font here
         // Move all enemies with gravity and tile collision
         mover(MAX_ENEMIES, enemies, tilt, count);
         mover(4, fooga, tilt, count);
-        mover(2, tornado, tilt, count);
+        //mover(2, tornado, tilt, count);
         mogera.movement(tilt, count);
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
-        Gravity(tornado, 2, tilt, count);
+        //Gravity(tornado, 2, tilt, count);
         //Gravity(&mogera, 1, tilt, count);
         // Update frozen state for all enemies (animate overlay, check unfreeze timer)
         for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -2330,7 +2333,7 @@ Text prompt(font); // Pass font here
         //Draw(MAX_ENEMIES, enemies, window);
         Draw(MAX_ENEMIES, enemies, window);
         Draw(4, fooga, window);
-        Draw(2, tornado, window);
+        //Draw(2, tornado, window);
         if(Mogera::bossHp > 0)
         mogera.Draw(window, tilt, count);
         //------------MOGERA DYING-------------------------------
