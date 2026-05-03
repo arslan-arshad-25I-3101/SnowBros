@@ -69,9 +69,9 @@ public:
     Mogera();
     virtual ~Mogera();
 
-    bool movement(Tiles* tiles, int tileCount, Player& play,
+    void movement(Tiles* tiles, int tileCount, Player& play,
                   DatabaseManager& db, std::string& username,
-                  int& lives, int& gems, int& score, int& levelNo);
+                  int& lives, int& gems, int& score, int& levelNo, bool& isMultiplayer, int& lives2);
 
     void spawnEnemy();
     void cleanupInactiveSpawns();
@@ -139,9 +139,9 @@ public:
     Gamakichi();
     ~Gamakichi();
 
-    bool movements(Tiles* tiles, int tileCount, Player& play,
+    void movements(Tiles* tiles, int tileCount, Player& play,
                    DatabaseManager& db, std::string& username,
-                   int& lives, int& gems, int& score, int& levelNo);
+                   int& lives, int& gems, int& score, int& levelNo, bool& isMultiplayer, int& lives2);
 
     void spawnEnemy();
     void cleanupInactiveSpawns();

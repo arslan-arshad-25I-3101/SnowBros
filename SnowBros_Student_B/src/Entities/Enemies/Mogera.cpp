@@ -148,9 +148,9 @@ Mogera::~Mogera() {
     delete[] spawns;  spawns    = nullptr;
 }
 
-bool Mogera::movement(Tiles* tiles, int tileCount, Player& play,
+void Mogera::movement(Tiles* tiles, int tileCount, Player& play,
               DatabaseManager& db, std::string& username,
-              int& lives, int& gems, int& score, int& levelNo) {
+              int& lives, int& gems, int& score, int& levelNo, bool& isMultiplayer, int& lives2) {
     int x = rand() % 10;
     if (x == 1) {
         bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
@@ -186,16 +186,31 @@ bool Mogera::movement(Tiles* tiles, int tileCount, Player& play,
     }
 
     for (int i = 0; i < spawnCount; i++) {
+        bool playerHit = false;
+        if (play.boun().findIntersection(spawns[i].getBounds())) {
+            playerHit = true;
+        }
         spawns[i].applyGravity(tiles, tileCount);
         spawns[i].movement();
-        if (play.boun().findIntersection(spawns[i].getBounds())) {
-            db.saveProgress(username, levelNo, lives - 1, gems, score);
-            cleanupInactiveSpawns();
-            return true;
+        if (playerHit) {
+            lives--;
+            if (lives > 0) {
+                play.setPos(12, 5);
+                play.startInvincibility();
+            }
+            else {
+                play.setPos(-999, -999);
+                if (!isMultiplayer || lives2 <= 0) {
+                    db.saveProgress(username, levelNo, 0, gems, score);
+                    //currentState = GameState::GameOver;
+                }
+            }
         }
     }
+
+
     cleanupInactiveSpawns();
-    return false;
+    
 }
 
 void Mogera::spawnEnemy() {
@@ -378,10 +393,10 @@ Gamakichi::~Gamakichi() {
     delete[] spawnss; spawnss = nullptr;
 }
 
-bool Gamakichi::movements(Tiles* tiles, int tileCount, Player& play,
-               DatabaseManager& db, std::string& username,
-               int& lives, int& gems, int& score, int& levelNo) {
-    boss->setScale({ 1128.f / 3500.f, 622.f / 1200.f });
+void Gamakichi::movements(Tiles* tiles, int tileCount, Player& play,
+               DatabaseManager& db, string& username,
+               int& lives, int& gems, int& score, int& levelNo, bool& isMultiplayer, int& lives2) {
+    boss->setScale({ 1128.f / 5000.f, 622.f / 1300.f });
 
     if (isSmoke && smokeClock.getElapsedTime().asSeconds() >= smokeDuration)
         isSmoke = false;
@@ -430,16 +445,31 @@ bool Gamakichi::movements(Tiles* tiles, int tileCount, Player& play,
     }
 
     for (int i = 0; i < spawnCount; i++) {
+        bool playerHit = false;
+        if (play.boun().findIntersection(spawnss[i].getBound())) {
+            playerHit = true;
+        }
         spawnss[i].applyGravity(tiles, tileCount);
         spawnss[i].movement();
-        if (play.boun().findIntersection(spawnss[i].getBound())) {
-            db.saveProgress(username, levelNo, lives - 1, gems, score);
-            cleanupInactiveSpawns();
-            return true;
+        if (playerHit) {
+            lives--;
+            if (lives > 0) {
+                play.setPos(12, 5);
+                play.startInvincibility();
+            }
+            else {
+                play.setPos(-999, -999);
+                if (!isMultiplayer || lives2 <= 0) {
+                    db.saveProgress(username, levelNo, 0, gems, score);
+                    //currentState = GameState::GameOver;
+                }
+            }
         }
     }
+
+
     cleanupInactiveSpawns();
-    return false;
+  
 }
 
 void Gamakichi::spawnEnemy() {

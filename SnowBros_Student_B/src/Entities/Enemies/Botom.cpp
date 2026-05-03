@@ -99,6 +99,12 @@ void Botom::kill() {
     dyingClock.restart();
     frozen = false;
     rolling = false;
+
+    // STORE DROP POSITION AND FLAG
+    if (sprite) {
+        dropPosition = sprite->getPosition();
+        shouldDropItem = true;
+    }
 }
 
 void Botom::updateFrozen() {
@@ -176,6 +182,25 @@ bool Botom::checkTileBelow(Tiles* tiles, int tileCount) {
         }
     }
     return false;
+}
+
+Item* Botom::dropPowerUp(float x, float y) {
+    // Random chance to drop (e.g., 30% drop rate)
+    if (rand() % 100 < 99) {
+        // Randomly select power-up type
+        int randomType = rand() % 2;
+        Item::ItemType type;
+
+        switch (randomType) {
+        case 0: type = Item::SHOES; break;
+        case 1: type = Item::ARROW; break;
+            //case 2: type = Item::HEALTH; break;
+            //case 3: type = Item::SPEED_BOOST; break;
+        }
+
+        return new Item(type, x, y);
+    }
+    return nullptr; // No drop
 }
 
 void Botom::movement(Tiles* tiles, int tileCount) {
