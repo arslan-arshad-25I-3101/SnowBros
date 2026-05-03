@@ -15,6 +15,47 @@ using namespace sf;
 
 GameState currentState = GameState::FlashScreen;
 
+class Item {
+private:
+    Sprite* itemSprite;
+    Texture tex;
+    enum ItemType { SHOES, ARROW , HEALTH, SPEED_BOOST };
+    ItemType type;
+    bool collected = false;
+    Clock lifespanClock;
+    float maxLifespan = 10.f; // disappears after 10s
+
+public:
+    Item(ItemType t, float x, float y) {
+        type = t;
+        // Load texture based on type
+        if (type == SHOES) tex.loadFromFile("coin.png");
+        else if (type == ARROW) tex.loadFromFile("powerup.png");
+        // etc...
+
+        itemSprite = new Sprite(tex);
+        itemSprite->setPosition({x,y});
+        lifespanClock.restart();
+    }
+
+    bool shouldRemove() {
+        return collected || lifespanClock.getElapsedTime().asSeconds() > maxLifespan;
+    }
+
+    bool checkPlayerCollision(FloatRect playerBounds) {
+        if (itemSprite->getGlobalBounds().findIntersection(playerBounds)) {
+            collected = true;
+            return true;
+        }
+        return false;
+    }
+
+    ItemType getType() { return type; }
+    Sprite getSprite() { return *itemSprite; }
+
+    ~Item() { delete itemSprite; }
+};
+
 // Global Power-up states
 bool hasSpeedBoost = false;
 bool hasSnowballPower = false;
@@ -2072,7 +2113,7 @@ class Gamakichi : public Mogera {
         }
 };
 
-int Gamakichi::bossHp = 1500;
+int Gamakichi::bossHp = 1200;
 
 bool snowballHitsGamakichi(Snowball& snowball, Gamakichi& boss) {
     if (!snowball.active) return false;
@@ -3239,8 +3280,7 @@ int main()
            score += 5000;
            mogera.setDead();
         }
-       else
-       score += 0;
+      
         // Draw frozen overlays on top of enemies
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (!enemies[i].isAlive()) continue;
