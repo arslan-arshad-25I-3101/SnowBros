@@ -30,6 +30,7 @@ private:
 public:
     Tiles() {
         tile.setSize({ Level::TILE_W, Level::TILE_H });
+        tile.setFillColor(Color::Transparent);
         //tile.setFillColor(Color(255, 0, 0, 191));
         //tile.setOutlineThickness(0.f);
     }
@@ -1109,6 +1110,7 @@ switch(choice){
     
     RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
 
+    GameState previousState = GameState::MainMenu;
     Level currentLevel;
     Texture bgTex;
     Sprite background(bgTex);
@@ -1249,9 +1251,9 @@ Text prompt(font); // Pass font here
                 FloatRect btnPlay({ 336.f, 242.f }, { 129.f, 31.f });       
                 FloatRect btnContinue({ 500.f, 242.f }, { 120.f, 31.f });
                 FloatRect btnMulti({ 333.f, 279.f }, { 135.f, 29.f });     
-                FloatRect btnShop({ 370.f, 316.f }, { 70.f, 29.f });       // Moved up (Option 3)
-                FloatRect btnLeader({ 333.f, 353.f }, { 135.f, 29.f });    // Moved down (Option 4)
-                FloatRect btnExit({ 328.f, 390.f }, { 144.f, 25.f });      // Option 5
+                FloatRect btnShop({ 370.f, 316.f }, { 70.f, 29.f });       
+                FloatRect btnLeader({ 333.f, 353.f }, { 135.f, 29.f });    
+                FloatRect btnExit({ 328.f, 390.f }, { 144.f, 25.f });      
 
                 Vector2f mousePos = window.mapPixelToCoords(Mouse::getPosition(window));
                 int hoveredOption = 0; 
@@ -1297,14 +1299,29 @@ Text prompt(font); // Pass font here
                     continueText.setPosition({ 505.f, 245.f });
                     window.draw(continueText);
                 }
+
+                // Restore On-Hover Selectors (Little Snowballs)
+                if (hoveredOption > 0) {
+                    CircleShape selector(8.f);
+                    selector.setFillColor(Color::White);
+                    // Match the Y positions of our buttons
+                    if (hoveredOption == 1) selector.setPosition({ 310.f, 250.f }); // Play
+                    if (hoveredOption == 2) selector.setPosition({ 310.f, 287.f }); // Multi
+                    if (hoveredOption == 3) selector.setPosition({ 345.f, 324.f }); // Shop
+                    if (hoveredOption == 4) selector.setPosition({ 310.f, 361.f }); // Lead
+                    if (hoveredOption == 5) selector.setPosition({ 305.f, 398.f }); // Exit
+                    if (hoveredOption == 6) selector.setPosition({ 480.f, 250.f }); // Continue
+                    window.draw(selector);
+                }
+
                 window.display();
             }
             break;
 
             case GameState::Ranking:
             {
-                struct Entry { string name; int level; int score; };
-                Entry topPlayers[100];
+                struct RankingEntry { string name; int level; int score; };
+                RankingEntry topPlayers[100];
                 int playerCount = 0;
 
                 ifstream file("progress.txt");
@@ -1332,14 +1349,16 @@ Text prompt(font); // Pass font here
                 for (int i = 0; i < playerCount - 1; i++) {
                     for (int j = 0; j < playerCount - i - 1; j++) {
                         if (topPlayers[j].score < topPlayers[j + 1].score) {
-                            Entry t = topPlayers[j];
+                            RankingEntry t = topPlayers[j];
                             topPlayers[j] = topPlayers[j + 1];
                             topPlayers[j + 1] = t;
                         }
                     }
                 }
 
-                while (const auto event = window.pollEvent()) {
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
                     if (event->is<Event::Closed>()) window.close();
                     if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                         if (keyPressed->code == Keyboard::Key::Escape || keyPressed->code == Keyboard::Key::Enter) {
@@ -1348,42 +1367,78 @@ Text prompt(font); // Pass font here
                     }
                 }
 
-                window.clear(Color(20, 20, 40));
-                Text leadText(font);
-                leadText.setCharacterSize(45);
-                leadText.setFillColor(Color::Yellow);
-                leadText.setString("HALL OF FAME");
-                leadText.setPosition({ 240.f, 40.f });
-                window.draw(leadText);
+                window.clear(Color(10, 10, 30));
 
-                leadText.setCharacterSize(25);
-                leadText.setFillColor(Color::Cyan);
-                leadText.setString("RANK    NAME         LEVEL    SCORE");
-                leadText.setPosition({ 100.f, 120.f });
-                window.draw(leadText);
+                // 1. Center Title
+                Text leadTitle(font);
+                leadTitle.setCharacterSize(50);
+                leadTitle.setFillColor(Color::Yellow);
+                leadTitle.setString("HALL OF FAME");
+                leadTitle.setStyle(Text::Bold);
+                FloatRect titleBounds = leadTitle.getGlobalBounds();
+                leadTitle.setPosition({ (800.f - titleBounds.size.x) / 2.f, 30.f });
+                window.draw(leadTitle);
 
-                leadText.setFillColor(Color::White);
-                int show = (playerCount < 5) ? playerCount : 5;
+                // 2. Table Header
+                RectangleShape headerBar({ 640.f, 40.f });
+                headerBar.setFillColor(Color(40, 40, 80));
+                headerBar.setPosition({ 80.f, 110.f });
+                window.draw(headerBar);
+
+                Text headerText(font);
+                headerText.setCharacterSize(22);
+                headerText.setFillColor(Color::Cyan);
+                headerText.setString("RANK   NAME   LEVEL   SCORE");
+                headerText.setPosition({ 100.f, 115.f });
+                window.draw(headerText);
+
+                // 3. Draw Rows
+                int show = (playerCount < 8) ? playerCount : 8; // Show top 8
                 for (int i = 0; i < show; i++) {
+                    // Row Background (alternating)
+                    RectangleShape rowBg({ 640.f, 45.f });
+                    rowBg.setFillColor(i % 2 == 0 ? Color(25, 25, 55) : Color(20, 20, 50));
+                    rowBg.setPosition({ 80.f, 160.f + i * 48.f });
+                    window.draw(rowBg);
+
+                    // Rank
                     string rankStr = to_string(i + 1);
                     if (i == 0) rankStr = "1ST";
                     else if (i == 1) rankStr = "2ND";
                     else if (i == 2) rankStr = "3RD";
                     else rankStr += "TH";
 
-                    string nameStr = topPlayers[i].name;
-                    if (nameStr.length() < 12) nameStr.append(12 - nameStr.length(), ' ');
+                    Text rowText(font);
+                    rowText.setCharacterSize(20);
+                    rowText.setFillColor(i < 3 ? Color::Yellow : Color::White);
+                    
+                    // Column Alignment (Fixed X positions)
+                    rowText.setString(rankStr);
+                    rowText.setPosition({ 100.f, 170.f + i * 48.f });
+                    window.draw(rowText);
 
-                    leadText.setString(rankStr + "     " + nameStr + "  " + to_string(topPlayers[i].level) + "        " + to_string(topPlayers[i].score));
-                    leadText.setPosition({ 100.f, 180.f + i * 50.f });
-                    window.draw(leadText);
+                    string nameStr = topPlayers[i].name;
+                    if (nameStr.length() > 12) nameStr = nameStr.substr(0, 12);
+                    rowText.setString(nameStr);
+                    rowText.setPosition({ 200.f, 170.f + i * 48.f });
+                    window.draw(rowText);
+
+                    rowText.setString(to_string(topPlayers[i].level));
+                    rowText.setPosition({ 420.f, 170.f + i * 48.f });
+                    window.draw(rowText);
+
+                    rowText.setString(to_string(topPlayers[i].score));
+                    rowText.setPosition({ 580.f, 170.f + i * 48.f });
+                    window.draw(rowText);
                 }
 
+                // 4. Back Prompt
                 Text backPrompt(font);
                 backPrompt.setCharacterSize(18);
-                backPrompt.setFillColor(Color(180, 180, 180));
-                backPrompt.setString("PRESS ENTER TO RETURN");
-                backPrompt.setPosition({ 280.f, 520.f });
+                backPrompt.setFillColor(Color(150, 150, 150));
+                backPrompt.setString("PRESS ENTER TO RETURN TO MAIN MENU");
+                FloatRect backBounds = backPrompt.getGlobalBounds();
+                backPrompt.setPosition({ (800.f - backBounds.size.x) / 2.f, 540.f });
                 window.draw(backPrompt);
 
                 window.display();
@@ -1449,13 +1504,13 @@ Text prompt(font); // Pass font here
                                     balloonTimer.restart();
                                 }
                             }
-                            if (shopHover == 6) currentState = GameState::MainMenu;
+                            if (shopHover == 6) currentState = previousState;
                         }
                     }
 
                     if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                         if (keyPressed->code == Keyboard::Key::Escape) {
-                            currentState = GameState::MainMenu;
+                            currentState = previousState;
                         }
                     }
                 }
@@ -1707,25 +1762,39 @@ Text prompt(font); // Pass font here
         window.draw(play.Draw());
 
         // --- HUD DRAWING ---
+        // 1. Semi-transparent background bar
+        RectangleShape hudBar({ 800.f, 40.f });
+        hudBar.setFillColor(Color(0, 0, 0, 160));
+        hudBar.setPosition({ 0.f, 0.f });
+        window.draw(hudBar);
+
         Text hudText(font);
-        hudText.setCharacterSize(20);
-        hudText.setFillColor(Color::White);
+        hudText.setCharacterSize(22);
         hudText.setOutlineColor(Color::Black);
-        hudText.setOutlineThickness(2.f);
+        hudText.setOutlineThickness(1.5f);
 
-        // Score
+        // Score (Left)
+        hudText.setFillColor(Color(255, 215, 0)); // Gold
         hudText.setString("SCORE: " + to_string(score));
-        hudText.setPosition({ 20.f, 10.f });
+        hudText.setPosition({ 20.f, 5.f });
         window.draw(hudText);
 
-        // Lives
+        // Level (Mid-Left)
+        hudText.setFillColor(Color::White);
+        hudText.setString("STAGE: " + to_string(levelNo));
+        hudText.setPosition({ 220.f, 5.f });
+        window.draw(hudText);
+
+        // Lives (Center)
+        hudText.setFillColor(Color(255, 60, 60)); // Arcade Red
         hudText.setString("LIVES: " + to_string(lives));
-        hudText.setPosition({ 350.f, 10.f });
+        hudText.setPosition({ 380.f, 5.f });
         window.draw(hudText);
 
-        // Gems
+        // Gems (Right)
+        hudText.setFillColor(Color(0, 255, 255)); // Cyan
         hudText.setString("GEMS: " + to_string(gems));
-        hudText.setPosition({ 650.f, 10.f });
+        hudText.setPosition({ 620.f, 5.f });
         window.draw(hudText);
 
         // --- LEVEL COMPLETION CHECK ---
@@ -1831,9 +1900,7 @@ Text prompt(font); // Pass font here
 
             case GameState::Paused:
             {
-                int hoveredOption = 1; // 1 = Resume, 2 = Menu
-                if (Keyboard::isKeyPressed(Keyboard::Key::Up)) hoveredOption = 1;
-                if (Keyboard::isKeyPressed(Keyboard::Key::Down)) hoveredOption = 2;
+                static int hoveredOption = 1; // Persistent choice
 
                 while (true)
                 {
@@ -1841,8 +1908,15 @@ Text prompt(font); // Pass font here
                     if (!event.has_value()) break;
                     if (event->is<Event::Closed>()) window.close();
                     if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Up) hoveredOption = (hoveredOption == 1) ? 3 : hoveredOption - 1;
+                        if (keyPressed->code == Keyboard::Key::Down) hoveredOption = (hoveredOption == 3) ? 1 : hoveredOption + 1;
+
                         if (keyPressed->code == Keyboard::Key::Enter) {
                             if (hoveredOption == 1) currentState = GameState::Playing;
+                            else if (hoveredOption == 2) {
+                                previousState = GameState::Paused; // Mark where we came from
+                                currentState = GameState::Shop;
+                            }
                             else currentState = GameState::MainMenu;
                         }
                         if (keyPressed->code == Keyboard::Key::P || keyPressed->code == Keyboard::Key::Escape) {
@@ -1851,32 +1925,73 @@ Text prompt(font); // Pass font here
                     }
                 }
 
-                // Draw game state in background (optional, but looks good)
-                // Since we are in a separate loop, we'd need to redraw the game objects or just clear
+                // 1. Draw game state in background (frozen)
                 window.clear(Color::Black);
                 window.draw(background);
-                
-                // Dim overlay
+                for (int i = 0; i < count; i++) {
+                    tilt[i].Draw(window);
+                }
+                Draw(MAX_ENEMIES, enemies, window);
+                Draw(4, fooga, window);
+                for (int i = 0; i < MAX_ENEMIES; i++) {
+                    if (enemies[i].isAlive() && enemies[i].isFrozen()) {
+                        window.draw(enemies[i].getFrozenOverlay());
+                    }
+                }
+                for (int i = 0; i < 4; i++) {
+                    if (fooga[i].isAlive() && fooga[i].isFrozen()) {
+                        window.draw(fooga[i].getFrozenOverlay());
+                    }
+                }
+                for (int i = 0; i < MAX_SNOWBALLS; i++) {
+                    snowballs[i].draw(window);
+                }
+                window.draw(play.Draw());
+
+                // 2. Dim overlay (Full Screen)
                 RectangleShape dim({ 800.f, 600.f });
-                dim.setFillColor(Color(0, 0, 0, 150));
+                dim.setFillColor(Color(0, 0, 0, 180));
                 window.draw(dim);
 
+                // 3. Central Menu Box (Slightly taller for 3 options)
+                RectangleShape menuBox({ 400.f, 350.f });
+                menuBox.setFillColor(Color(20, 20, 50, 230));
+                menuBox.setOutlineColor(Color::White);
+                menuBox.setOutlineThickness(2.f);
+                menuBox.setPosition({ 200.f, 125.f });
+                window.draw(menuBox);
+
                 Text pauseText(font);
-                pauseText.setCharacterSize(60);
-                pauseText.setFillColor(Color::White);
+                pauseText.setCharacterSize(50);
+                pauseText.setFillColor(Color::Yellow);
                 pauseText.setString("PAUSED");
-                pauseText.setPosition({ 280.f, 150.f });
+                pauseText.setStyle(Text::Bold);
+                FloatRect pBounds = pauseText.getGlobalBounds();
+                pauseText.setPosition({ (800.f - pBounds.size.x) / 2.f, 150.f });
                 window.draw(pauseText);
 
-                pauseText.setCharacterSize(30);
+                pauseText.setCharacterSize(25);
+                pauseText.setStyle(Text::Regular);
+                
+                // Option 1: Resume
                 pauseText.setString("RESUME");
-                pauseText.setPosition({ 340.f, 300.f });
-                pauseText.setFillColor(hoveredOption == 1 ? Color::Yellow : Color::White);
+                pauseText.setFillColor(hoveredOption == 1 ? Color::Cyan : Color::White);
+                FloatRect rBounds = pauseText.getGlobalBounds();
+                pauseText.setPosition({ (800.f - rBounds.size.x) / 2.f, 240.f });
                 window.draw(pauseText);
 
+                // Option 2: Shop
+                pauseText.setString("SHOP");
+                pauseText.setFillColor(hoveredOption == 2 ? Color::Cyan : Color::White);
+                FloatRect sBounds = pauseText.getGlobalBounds();
+                pauseText.setPosition({ (800.f - sBounds.size.x) / 2.f, 300.f });
+                window.draw(pauseText);
+
+                // Option 3: Main Menu
                 pauseText.setString("MAIN MENU");
-                pauseText.setPosition({ 320.f, 360.f });
-                pauseText.setFillColor(hoveredOption == 2 ? Color::Yellow : Color::White);
+                pauseText.setFillColor(hoveredOption == 3 ? Color::Cyan : Color::White);
+                FloatRect mBounds = pauseText.getGlobalBounds();
+                pauseText.setPosition({ (800.f - mBounds.size.x) / 2.f, 360.f });
                 window.draw(pauseText);
 
                 window.display();
@@ -1896,27 +2011,35 @@ Text prompt(font); // Pass font here
                     }
                 }
 
-                window.clear(Color(0, 100, 0)); // Dark Green for Victory
+                window.clear(Color(0, 60, 0)); // Dark Green for Victory
                 Text winText(font);
-                winText.setCharacterSize(50);
+                winText.setOutlineColor(Color::Black);
+                winText.setOutlineThickness(2.f);
+
+                winText.setCharacterSize(60);
                 winText.setFillColor(Color::Yellow);
                 winText.setString("CONGRATULATIONS!");
-                winText.setPosition({ 150.f, 150.f });
+                FloatRect b1 = winText.getGlobalBounds();
+                winText.setPosition({ (800.f - b1.size.x) / 2.f, 100.f });
                 window.draw(winText);
 
                 winText.setCharacterSize(30);
                 winText.setFillColor(Color::White);
                 winText.setString("YOU SAVED THE SNOW WORLD!");
-                winText.setPosition({ 180.f, 250.f });
+                FloatRect b2 = winText.getGlobalBounds();
+                winText.setPosition({ (800.f - b2.size.x) / 2.f, 220.f });
                 window.draw(winText);
 
                 winText.setString("FINAL SCORE: " + to_string(score));
-                winText.setPosition({ 250.f, 350.f });
+                FloatRect b3 = winText.getGlobalBounds();
+                winText.setPosition({ (800.f - b3.size.x) / 2.f, 320.f });
                 window.draw(winText);
 
-                winText.setCharacterSize(20);
+                winText.setCharacterSize(22);
+                winText.setFillColor(Color(200, 200, 200));
                 winText.setString("PRESS ENTER FOR MAIN MENU");
-                winText.setPosition({ 250.f, 500.f });
+                FloatRect b4 = winText.getGlobalBounds();
+                winText.setPosition({ (800.f - b4.size.x) / 2.f, 500.f });
                 window.draw(winText);
 
                 window.display();
@@ -1925,9 +2048,7 @@ Text prompt(font); // Pass font here
 
             case GameState::GameOver:
             {
-                int hoveredOption = 1; // 1 = Retry, 2 = Menu
-                if (Keyboard::isKeyPressed(Keyboard::Key::Up)) hoveredOption = 1;
-                if (Keyboard::isKeyPressed(Keyboard::Key::Down)) hoveredOption = 2;
+                static int hoveredOption = 1; // Persistent selection
 
                 while (true)
                 {
@@ -1936,9 +2057,12 @@ Text prompt(font); // Pass font here
                     if (event->is<Event::Closed>()) window.close();
                     
                     if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Up) hoveredOption = 1;
+                        if (keyPressed->code == Keyboard::Key::Down) hoveredOption = 2;
+
                         if (keyPressed->code == Keyboard::Key::Enter) {
                             if (hoveredOption == 1) {
-                                // Retry Level 1
+                                // Reset to Level 1
                                 levelNo = 1;
                                 lives = 2;
                                 score = 0;
@@ -1955,23 +2079,29 @@ Text prompt(font); // Pass font here
                     }
                 }
 
-                window.clear(Color(100, 0, 0)); // Dark Red
+                window.clear(Color(80, 0, 0)); // Dark Red
                 Text loseText(font);
-                loseText.setCharacterSize(60);
+                loseText.setOutlineColor(Color::Black);
+                loseText.setOutlineThickness(2.f);
+
+                loseText.setCharacterSize(70);
                 loseText.setFillColor(Color::White);
                 loseText.setString("GAME OVER");
-                loseText.setPosition({ 220.f, 100.f });
+                FloatRect b1 = loseText.getGlobalBounds();
+                loseText.setPosition({ (800.f - b1.size.x) / 2.f, 120.f });
                 window.draw(loseText);
 
-                loseText.setCharacterSize(30);
+                loseText.setCharacterSize(35);
                 loseText.setString("RETRY");
-                loseText.setPosition({ 350.f, 300.f });
-                loseText.setFillColor(hoveredOption == 1 ? Color::Yellow : Color::White);
+                loseText.setFillColor(hoveredOption == 1 ? Color::Yellow : Color(180, 180, 180));
+                FloatRect b2 = loseText.getGlobalBounds();
+                loseText.setPosition({ (800.f - b2.size.x) / 2.f, 320.f });
                 window.draw(loseText);
 
                 loseText.setString("MAIN MENU");
-                loseText.setPosition({ 320.f, 360.f });
-                loseText.setFillColor(hoveredOption == 2 ? Color::Yellow : Color::White);
+                loseText.setFillColor(hoveredOption == 2 ? Color::Yellow : Color(180, 180, 180));
+                FloatRect b3 = loseText.getGlobalBounds();
+                loseText.setPosition({ (800.f - b3.size.x) / 2.f, 390.f });
                 window.draw(loseText);
 
                 window.display();
