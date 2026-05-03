@@ -11,8 +11,41 @@
 
 using namespace std;
 using namespace sf;
-
+enum class GameState { Login, MainMenu, ModeSelect, Shop, Playing, Paused, LevelComplete, GameOver, GameComplete, Signup, FlashScreen, LevelSelect, Ranking, Victory, CharacterSelect };
 GameState currentState = GameState::FlashScreen;
+
+void addItem(Item**& itemArray, int& itemCount, Item* newItem) {
+    itemCount += 1;
+    Item** newArray = new Item * [itemCount];
+
+    for (int i = 0; i < itemCount; i++) {
+        if (i < itemCount - 1)
+            newArray[i] = itemArray[i];
+        else
+            newArray[i] = newItem;
+    }
+
+    delete[] itemArray;
+    itemArray = newArray;
+}
+
+void removeItem(Item**& itemArray, int& itemCount, int index) {
+    if (itemCount == 0) return;
+
+    Item** newArray = new Item * [itemCount - 1];
+    int newIndex = 0;
+
+    for (int i = 0; i < itemCount; i++) {
+        if (i != index) {
+            newArray[newIndex] = itemArray[i];
+            newIndex++;
+        }
+    }
+
+    delete[] itemArray;
+    itemArray = newArray;
+    itemCount -= 1;
+}
 
 // Global Power-up states
 bool hasSpeedBoost = false;
@@ -20,7 +53,7 @@ bool hasSnowballPower = false;
 bool hasDistanceIncrease = false;
 bool hasBalloonMode = false;
 
-enum class GameState { Login, MainMenu, ModeSelect, Shop, Playing, Paused, LevelComplete, GameOver, GameComplete, Signup, FlashScreen, LevelSelect, Ranking, Victory, CharacterSelect };
+
 
 // Function declarations
 void mover(int n, Botom* other, Tiles* tiles, int tileCount);
@@ -54,215 +87,11 @@ bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileC
 
 
 
-    void Draw(RenderWindow& window) {
-        if (active) {
-            window.draw(*spawn);
-        }
-    }
 
-    ~MogeraChild() {
-        delete spawn;
-        spawn = nullptr;
-    }
-};
-
-
-void vectora(MogeraChild*& a, int* n, MogeraChild v) {
-    *n += 1;
-    MogeraChild* arr = new MogeraChild[*n];
-    for (int i = 0; i < *n; i++) {
-        if (i < *n - 1)
-            arr[i] = a[i];
-        else
-            arr[i] = v;
-    }
-    delete[] a;
-    a = nullptr;
-    a = arr;
-}
 
 //------------------------------------MOGERA BOSS-------------------------
 
-class Mogera {
-protected:
-    Sprite* bossChest;
-    Sprite* bossLeg;
-    Texture bodyText[3];
-    Texture legText[3];
-    int bodyFrames = 0;
-    int legFrames = 0;
-    float frametime = 0.15f;
-    Clock clock;
 
-   
-    MogeraChild* spawns;
-    int spawnCount;
-    Clock spawnClock;
-    float spawnInterval = 3.0f;  
-    bool isDead = false;
-
-public:
-static int bossHp;
-    Mogera() {
-        bodyText[0].loadFromFile("mogera/mogera_01.png");
-        bodyText[1].loadFromFile("mogera/mogera_02.png");
-        bodyText[2].loadFromFile("mogera/mogera_03.png");
-        legText[0].loadFromFile("mogera/mogera_leg_01.png");
-        legText[1].loadFromFile("mogera/mogera_leg_02.png");
-        legText[2].loadFromFile("mogera/mogera_leg_03.png");
-        bossChest = new Sprite(bodyText[0]);
-        bossLeg = new Sprite(legText[0]);
-
-        // Initialize spawn array
-        spawns = nullptr;
-        spawnCount = 0;
-    }
-
-    void movement(Tiles* tiles, int tileCount) {
-        int x = rand() % 10;
-        if (x == 1) {
-            bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
-            bossLeg->setScale({ 504.f / 1000.f, 118.f / 254.f });
-            bossChest->move({ 0.0f, 0.0f });
-            bossLeg->move({ 0.0f, 0.0f });
-
-            if (clock.getElapsedTime().asSeconds() > frametime) {
-                bodyFrames++;
-                if (bodyFrames >= 3)
-                    bodyFrames = 0;
-                bossChest->setTexture(bodyText[bodyFrames]);
-                bossLeg->setTexture(legText[bodyFrames]);
-                clock.restart();
-            }
-        }
-
-        if (bossLeg->getPosition().y >= 550.f) {
-            bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
-            bossLeg->setScale({ 504.f / 1000.f, 118.f / 254.f });
-            bossChest->move({ 0.0f, 0.0f });
-            bossLeg->move({ 0.0f, 0.0f });
-
-            if (clock.getElapsedTime().asSeconds() > frametime) {
-                bodyFrames++;
-                if (bodyFrames >= 3)
-                    bodyFrames = 0;
-                bossChest->setTexture(bodyText[bodyFrames]);
-                bossLeg->setTexture(legText[bodyFrames]);
-                clock.restart();
-            }
-        }
-
-       
-        if (spawnClock.getElapsedTime().asSeconds() > spawnInterval) {
-            spawnEnemy();
-            spawnClock.restart();
-        }
-
-       
-        for (int i = 0; i < spawnCount; i++) {
-        bool playerHit = false;
-        //if (![i].isAlive() || enemies[i].isFrozen() || enemies[i].isDying()) continue;
-        if (play.boun().findIntersection(spawns[i].getBounds())) {
-            playerHit = true;
-        }
-        spawns[i].applyGravity(tiles, tileCount);
-            spawns[i].movement();
-        }
-
-       
-        cleanupInactiveSpawns();
-    }
-
-    void spawnEnemy() {
-        MogeraChild newSpawn;
-        float y = 0.0f;
-        int r = rand()%3;
-        if(r == 0)
-        y += 0.0f;
-        if(r == 1)
-        y += 42.85f*2;
-        if(r == 2)
-        y += 42.85f*4;
-        newSpawn.setPos(bossChest->getPosition().x, bossChest->getPosition().y+y);
-        vectora(spawns, &spawnCount, newSpawn);
-    }
-
-    void cleanupInactiveSpawns() {
-        // Count active spawns
-        int activeCount = 0;
-        for (int i = 0; i < spawnCount; i++) {
-            if (spawns[i].isActive()) {
-                activeCount++;
-            }
-        }
-
-        // If all are active, no cleanup needed
-        if (activeCount == spawnCount) return;
-
-        // Create new array with only active spawns
-        MogeraChild* newSpawns = new MogeraChild[activeCount];
-        int index = 0;
-        for (int i = 0; i < spawnCount; i++) {
-            if (spawns[i].isActive()) {
-                newSpawns[index] = spawns[i];
-                index++;
-            }
-        }
-
-        delete[] spawns;
-        spawns = newSpawns;
-        spawnCount = activeCount;
-    }
-
-    void setPos(float x, float y, float xx, float yy) {
-        bossChest->setOrigin({ xx, yy });
-        bossLeg->setOrigin({ xx, yy });
-        bossChest->setPosition({ x, y });
-        bossLeg->setPosition({ x, y + 205.7f });
-    }
-
-    void Draw(RenderWindow& window, Tiles* tiles, int tileCount) {
-        window.draw(*bossChest);
-        window.draw(*bossLeg);
-
-        // Draw all spawns
-        for (int i = 0; i < spawnCount; i++) {
-            spawns[i].Draw(window);
-        }
-    }
-
-    FloatRect boun() {
-        return bossChest->getGlobalBounds();
-    }
-
-    void setCol() {
-        bossChest->setColor(Color::Red);
-    }
-
-    void setNor() {
-        bossChest->setColor(Color::White);
-    }
-
-    void checkdead() {
-        if(bossHp <= 0)
-        isDead = true;
-    }
-
-    bool getDeath() {
-        return isDead;
-    }
-
-    ~Mogera() {
-        delete bossChest;
-        delete bossLeg;
-        bossChest = nullptr;
-        bossLeg = nullptr;
-        delete[] spawns;
-        spawns = nullptr;
-    }
-};
-
-int Mogera::bossHp = 900;
 
 bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
     if (!snowball.active) return false;
@@ -274,7 +103,19 @@ bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
     return false;
 }
 
-void LoadLevel(int levelNo, Level& level, Texture& bgTex, Sprite& background, Tiles*& tilt, int& tileCount);
+bool snowballHitsGamakichi(Snowball& snowball, Gamakichi& boss) {
+    if (!snowball.active) return false;
+    if (snowball.boun().findIntersection(boss.boun())) {
+        boss.setCol();
+        Gamakichi::bossHp--;
+        return true;
+    }
+    //boss.setNor();
+    return false;
+}
+
+void LoadLevel(int levelNo, Level& currentLevel, Texture& bgTex, Sprite& background,
+    Tiles*& tilt, int& count);
 
 struct EnemySpawnPoint { int row; int col; };
 
@@ -309,13 +150,13 @@ void spawnFoogas(Fooga* foogas) {
     for (int i = 0; i < 4; i++) {
         foogas[i].init();
         foogas[i].reset();
-        foogas[i].kill(); // Start inactive — reset() sets alive=true which blocks level completion
     }
     foogas[0].setPos(155.f, 125.f, fx, fy);
     foogas[1].setPos(355.f, 125.f, fx, fy);
     foogas[2].setPos(155.f, 275.f, fx, fy);
     foogas[3].setPos(555.f, 275.f, fx, fy);
 }
+
 
 void spawnEnemies(Botom enemies[], int levelNo) {
     for (int i = 0; i < 6; i++) {
@@ -325,9 +166,139 @@ void spawnEnemies(Botom enemies[], int levelNo) {
     }
 }
 
+void spawnEnemiesForLevel(Botom* enemies, int levelNo) {
+    // First, hide all enemies
+    for (int i = 0; i < 6; i++) {
+        enemies[i].setPos(-999.f, -999.f, 0.f, 0.f);
+        enemies[i].reset();
+    }
+
+    switch (levelNo) {
+    case 1: // 3 enemies
+        enemies[0].setPos(3, 3);
+        enemies[1].setPos(3, 10);
+        enemies[2].setPos(8, 7);
+        break;
+
+    case 2: // 4 enemies
+        enemies[0].setPos(2, 2);
+        enemies[1].setPos(2, 12);
+        enemies[2].setPos(6, 7);
+        enemies[3].setPos(9, 4);
+        break;
+
+    case 3: // 5 enemies
+        enemies[0].setPos(1, 3);
+        enemies[1].setPos(1, 11);
+        enemies[2].setPos(5, 7);
+        enemies[3].setPos(8, 4);
+        enemies[4].setPos(8, 10);
+        break;
+
+    case 4: // 6 enemies
+        enemies[0].setPos(2, 2);
+        enemies[1].setPos(2, 6);
+        enemies[2].setPos(2, 10);
+        enemies[3].setPos(7, 3);
+        enemies[4].setPos(7, 8);
+        enemies[5].setPos(7, 12);
+        break;
+
+    case 5: // BOSS LEVEL - 2 enemies
+        enemies[0].setPos(3, 3);
+        enemies[1].setPos(3, 11);
+        break;
+
+    case 6: // 5 enemies
+        enemies[0].setPos(1, 4);
+        enemies[1].setPos(1, 10);
+        enemies[2].setPos(5, 2);
+        enemies[3].setPos(5, 12);
+        enemies[4].setPos(9, 7);
+        break;
+
+    case 7: // 7 enemies
+        enemies[0].setPos(2, 2);
+        enemies[1].setPos(2, 7);
+        enemies[2].setPos(2, 12);
+        enemies[3].setPos(6, 4);
+        enemies[4].setPos(6, 10);
+        enemies[5].setPos(9, 2);
+        enemies[6].setPos(9, 12);
+        break;
+
+    case 8: // 8 enemies
+        enemies[0].setPos(1, 1);
+        enemies[1].setPos(1, 6);
+        enemies[2].setPos(1, 13);
+        enemies[3].setPos(5, 3);
+        enemies[4].setPos(5, 11);
+        enemies[5].setPos(9, 1);
+        enemies[6].setPos(9, 7);
+        enemies[7].setPos(9, 13);
+        break;
+
+    case 9: // 9 enemies
+        enemies[0].setPos(1, 2);
+        enemies[1].setPos(1, 7);
+        enemies[2].setPos(1, 12);
+        enemies[3].setPos(5, 1);
+        enemies[4].setPos(5, 7);
+        enemies[5].setPos(5, 13);
+        enemies[6].setPos(9, 3);
+        enemies[7].setPos(9, 8);
+        enemies[8].setPos(9, 11);
+        break;
+
+    case 10: // FINAL BOSS - 1 enemy
+        enemies[0].setPos(5, 7);
+        break;
+    }
+}
+
+void spawnFoogasForLevel(Fooga* fooga, int levelNo) {
+    // Hide all foogas by default
+    for (int i = 0; i < 4; i++) {
+        fooga[i].setPos(-999.f, -999.f, 0.f, 0.f);
+        fooga[i].reset();
+    }
+
+    // Spawn foogas on certain levels (customize as you want)
+    if (levelNo == 3 || levelNo == 6 || levelNo == 9) {
+        fooga[0].setPos(4, 5);
+        fooga[1].setPos(4, 9);
+    }
+}
+
+void spawnBossForLevel(Mogera& mogera, Gamakichi& gamakichi, int levelNo) {
+    if (levelNo == 5) {
+        // Spawn Mogera
+        Mogera::bossHp = 100;
+        mogera.setPos(400.f, 200.f, 0.f, 0.f);
+        cout << "LEVEL 5: MOGERA BOSS APPEARS!" << endl;
+    }
+    else {
+        // Hide Mogera on other levels
+        Mogera::bossHp = 0;
+        mogera.setPos(-999.f, -999.f, 0.f, 0.f);
+    }
+
+    if (levelNo == 10) {
+        // Spawn Gamakichi
+        Gamakichi::bossHp = 150;  // If you have this variable
+        gamakichi.setPos(400.f, 200.f, 0.f, 0.f);
+        cout << "LEVEL 10: GAMAKICHI FINAL BOSS APPEARS!" << endl;
+    }
+    else {
+        // Hide Gamakichi on other levels
+        gamakichi.setPos(-999.f, -999.f, 0.f, 0.f);
+    }
+}
+
 int main()
 {
-    // Initializing Random Seed
+    Item** worldItems = nullptr;  
+    int itemCount = 0;
     srand(static_cast<unsigned>(time(nullptr)));
 
     RenderWindow window(VideoMode({ 800u, 600u }), "SNOW BROS");
@@ -444,10 +415,7 @@ int main()
     mogera.setPos(650.f, 300.f, vx, vy);
 
     //-----------GAMAKICHI BOSS-----------------
-    Gamakichi gamakichi;
-    float ux = 1130.f / 2.f;
-    float uy = 620.f / 2.f;
-    gamakichi.setPos(400.f, 500.f, ux, uy);
+    
     window.setFramerateLimit(60);
 
     Font font;
@@ -458,9 +426,7 @@ int main()
 
     //-----------MOGERA BOSS-------------------
    
-    float vx = 572.f/2.f;
-    float vy = 460.f/2.f;
-    mogera.setPos(650.f, 300.f, vx, vy);
+    
 
     //-----------GAMAKICHI BOSS-----------------
     Gamakichi gamakichi;
@@ -470,6 +436,10 @@ int main()
 
     Text title(font);  // Pass font here
     Text prompt(font); // Pass font here
+
+    spawnEnemiesForLevel(enemies, levelNo);
+    spawnFoogasForLevel(fooga, levelNo);
+    spawnBossForLevel(mogera, gamakichi, levelNo);
 
 
     title.setString("SNOW BROS");
@@ -1207,6 +1177,13 @@ int main()
                 continue;
                 }
 
+            for (int i = 0; i < MAX_SNOWBALLS; i++) {
+                if (!snowballs[i].active) {
+                    gamakichi.setNor();
+                    continue;
+                }
+               }
+
             for (int j = 0; j < MAX_ENEMIES; j++) { // checking for collision between snowball and enemy
                 if (!enemies[j].isAlive()) continue;
                 if (snowballHitsEnemy(snowballs[i], enemies[j], hasSnowballPower)) {
@@ -1399,11 +1376,13 @@ int main()
         // Move all enemies with gravity and tile collision
         mover(MAX_ENEMIES, enemies, tilt, count);
         mover(4, fooga, tilt, count);
+        mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo, isMultiplayer, lives2);
+        gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo, isMultiplayer, lives2);
         //mover(2, tornado, tilt, count);
-        if (mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo))
-            currentState = GameState::GameOver;
-        if (gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo))
-            currentState = GameState::GameOver;
+        //if (mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo))
+            //currentState = GameState::GameOver;
+        //if (gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo))
+            //currentState = GameState::GameOver;
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
@@ -1524,32 +1503,52 @@ int main()
         hudText.setPosition({ 685.f, 8.f });
         window.draw(hudText);
 
-        // --- LEVEL COMPLETION CHECK ---
         bool allDead = true;
-        
+
         // 1. Check regular enemies
         for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (enemies[i].isAlive()) { allDead = false; break; }
-        }
-        
-        // 2. Check Foogas
-        if (allDead) {
-            for (int i = 0; i < 4; i++) {
-                if (fooga[i].isAlive()) { allDead = false; break; }
+            if (enemies[i].isAlive()) {
+                allDead = false;
+                break;
             }
         }
 
+        // 2. Check Foogas
+        if (allDead) {
+            for (int i = 0; i < 4; i++) {
+                if (fooga[i].isAlive()) {
+                    allDead = false;
+                    break;
+                }
+            }
+        }
+
+        // 3. Check bosses
+        if (allDead && levelNo == 5 && Mogera::bossHp > 0) {
+            allDead = false;  // Mogera still alive
+        }
+        if (allDead && levelNo == 10) {
+            // Check if Gamakichi is alive
+            // Adjust this condition based on your Gamakichi class
+            // Example: if you have Gamakichi::bossHp
+            allDead = false;
+        }
 
         if (allDead) {
             levelNo++;
             if (levelNo > 10) {
+                // GAME WON!
                 currentState = GameState::Victory;
                 levelNo = 1;
-            } else {
+            }
+            else {
                 db.saveProgress(username, levelNo, lives, gems, score);
-                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
-                spawnEnemies(enemies, levelNo);
-                spawnFoogas(fooga);
+
+                // SPAWN NEW LEVEL
+                spawnEnemiesForLevel(enemies, levelNo);
+                spawnFoogasForLevel(fooga, levelNo);
+                spawnBossForLevel(mogera, gamakichi, levelNo);
+
                 play.setPos(12, 5);
                 if (isMultiplayer) play2.setPos(12, 7);
             }
@@ -1839,6 +1838,10 @@ int main()
 
     delete[] tilt;
     tilt = nullptr;
+    for (int i = 0; i < itemCount; i++) {
+        delete worldItems[i];
+    }
+    delete[] worldItems;
     return 0;
 }
 
@@ -1888,6 +1891,7 @@ void Draw(int n, Botom* other, RenderWindow& window) {
     for (int i = 0; i < n; i++) {
         if (other[i].isAlive() || other[i].isDying()) {
             window.draw(other[i].getSprite());
+            other[i].drawItem(window);
             if (other[i].isFrozen()) {
                 window.draw(other[i].getFrozenOverlay());
             }
@@ -1931,13 +1935,34 @@ void mover(int n, Tornado* other, Tiles* tiles, int tileCount) {
 
 void Gravity(int n, Botom* other, Tiles* tiles, int c) {
     for (int i = 0; i < n; i++) {
-        if (other[i].isAlive()) other[i].applyGravity(tiles, c);
+        if (other[i].currentState == Botom::JUMPING_UP) {
+            other[i].antiGravity(tiles, c);
+        }
+        else {
+            bool isTile = other[i].checkTileBelow(tiles, c);
+            if (!isTile) {
+                other[i].applyGravity(tiles, c);
+            }
+            else {
+                int x = rand() % 50;
+                if (x == 1)
+                    other[i].antiGravity(tiles, c);
+                else if (x == 2)
+                    other[i].applyGravity(tiles, c);
+
+            }
+        }
     }
 }
 
 void Gravity(int n, Fooga* other, Tiles* tiles, int c) {
     for (int i = 0; i < n; i++) {
-        if (other[i].isAlive()) other[i].applyGravity(tiles, c);
+        if (other[i].isFullyFrozen() || other[i].isFrozen()) {
+            bool isTile = other[i].checkTileBelow(tiles, c);
+            if (!isTile) {
+                other[i].applyGravity(tiles, c);
+            }
+        }
     }
 }
 

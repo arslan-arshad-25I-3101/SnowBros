@@ -28,7 +28,7 @@ void Fooga::init() {
     frozenIndex = 0;
 }
 
-void Fooga::movement(Tiles* tiles, int tileCount) {
+void Fooga::movement(Tiles* tiles, int tileCount)  {
     if (!alive || dying) return;
     if (rolling) {
         if (rollingClock.getElapsedTime().asSeconds() > 3.f) { kill(); return; }
