@@ -13,6 +13,8 @@
 using namespace std;
 using namespace sf;
 
+GameState currentState = GameState::FlashScreen;
+
 // Global Power-up states
 bool hasSpeedBoost = false;
 bool hasSnowballPower = false;
@@ -1475,7 +1477,9 @@ public:
             window.draw(*spawn);
         }
     }
-
+    FloatRect getBounds() {
+        return spawn->getGlobalBounds();
+    }
     ~MogeraChild() {
         delete spawn;
         spawn = nullptr;
@@ -1515,7 +1519,7 @@ protected:
     int spawnCount;
     Clock spawnClock;
     float spawnInterval = 3.0f;  
-    bool isDead = false;
+    bool isDead = true;
 
 public:
 static int bossHp;
@@ -1529,12 +1533,12 @@ static int bossHp;
         bossChest = new Sprite(bodyText[0]);
         bossLeg = new Sprite(legText[0]);
 
-        // Initialize spawn array
+        
         spawns = nullptr;
         spawnCount = 0;
     }
 
-    void movement(Tiles* tiles, int tileCount) {
+    void movement(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db,string& username, int& lives, int& gems, int& score, int& levelNo) {
         int x = rand() % 10;
         if (x == 1) {
             bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
@@ -1578,6 +1582,12 @@ static int bossHp;
         for (int i = 0; i < spawnCount; i++) {
         spawns[i].applyGravity(tiles, tileCount);
             spawns[i].movement();
+            if (play.boun().findIntersection(spawns[i].getBounds())) {
+           
+                db.saveProgress(username, levelNo, lives-1, gems, score);
+                currentState = GameState::GameOver;
+                break;
+            }
         }
 
        
@@ -1599,7 +1609,7 @@ static int bossHp;
     }
 
     void cleanupInactiveSpawns() {
-        // Count active spawns
+      
         int activeCount = 0;
         for (int i = 0; i < spawnCount; i++) {
             if (spawns[i].isActive()) {
@@ -1607,10 +1617,10 @@ static int bossHp;
             }
         }
 
-        // If all are active, no cleanup needed
+       
         if (activeCount == spawnCount) return;
 
-        // Create new array with only active spawns
+       
         MogeraChild* newSpawns = new MogeraChild[activeCount];
         int index = 0;
         for (int i = 0; i < spawnCount; i++) {
@@ -1636,7 +1646,7 @@ static int bossHp;
         window.draw(*bossChest);
         window.draw(*bossLeg);
 
-        // Draw all spawns
+       
         for (int i = 0; i < spawnCount; i++) {
             spawns[i].Draw(window);
         }
@@ -1660,7 +1670,12 @@ static int bossHp;
     }
 
     bool getDeath() {
+    
         return isDead;
+    }
+
+    void setDead(bool x = false) {
+    isDead = x;
     }
 
     ~Mogera() {
@@ -1688,6 +1703,352 @@ bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
     return false;
 }
 //-----------------------------------MOGERA BOSS END--------------------------
+
+//------------------------GAMAKICHI BOSS-----------------------------------
+
+class Bomb : public MogeraChild {
+protected:
+Texture texts[4];
+Sprite* spawns;
+Clock lifeClock; 
+float explosionTime = 2.0f;  
+bool hasExploded = false;
+bool checkCollision(Tiles* tiles, int tileCount) {
+    auto bounds = spawn->getGlobalBounds();
+    FloatRect hitbox({ bounds.position.x + 6.f, bounds.position.y + 6.f },
+        { bounds.size.x - 6.f, bounds.size.y - 12.f });
+
+    for (int i = 0; i < tileCount; i++) {
+        if (hitbox.findIntersection(tiles[i].boun())) {
+            return true;
+        }
+    }
+    return false;
+}
+public:
+    Bomb() {
+        texts[0].loadFromFile("bomb/bomb_01.png");
+        texts[1].loadFromFile("bomb/bomb_02.png");
+        texts[2].loadFromFile("bomb/bomb_03.png");
+        texts[3].loadFromFile("bomb/bomb_04.png");
+        spawns = new Sprite(texts[0]);
+        lifeClock.restart();
+       
+       }
+    Bomb(const Bomb& other) {
+        for (int i = 0; i < 4; i++) {
+            texts[i] = other.texts[i];
+        }
+        spawns = new Sprite(texts[other.currentFrame]);
+        spawns->setPosition(other.spawns->getPosition());
+        spawns->setOrigin(other.spawns->getOrigin());
+        spawns->setScale(other.spawns->getScale());
+
+        currentFrame = other.currentFrame;
+        frametime = other.frametime;
+        active = other.active;
+        animClock = other.animClock;
+    }
+    Bomb& operator=(const Bomb& other) {
+        if (this != &other) {
+            delete spawns;
+            for (int i = 0; i < 4; i++) {
+                texts[i] = other.texts[i];
+            }
+            spawns = new Sprite(texts[other.currentFrame]);
+            spawns->setPosition(other.spawns->getPosition());
+            spawns->setOrigin(other.spawns->getOrigin());
+            spawns->setScale(other.spawns->getScale());
+
+            currentFrame = other.currentFrame;
+            frametime = other.frametime;
+            active = other.active;
+            animClock = other.animClock;
+        }
+        return *this;
+    }
+    void setPos(float x, float y, float w = 220.f, float h = 250.f) {
+        spawns->setOrigin({ w, h });
+        spawns->setPosition({ x, y });
+    }
+    void applyGravity(Tiles* tiles, int tileCount) {
+        velocityY += gravity;
+        float limit = spawns->getPosition().y + velocityY;
+        if (limit < 15.f) {
+            velocityY = 15.f - spawns->getPosition().y;
+        }
+        spawn->move({ 0.f, velocityY });
+
+        if (velocityY >= 0.f && checkCollision(tiles, tileCount)) {
+            spawns->move({ 0.f, -velocityY });
+            velocityY = 0.f;
+            onGround = true;
+            isJump = false;
+        }
+        else {
+            onGround = false;
+            if (velocityY < 0) {
+                if (animClock.getElapsedTime().asSeconds() > frametime) {
+                    currentFrame++;
+                    if (currentFrame >= 7)
+                        currentFrame = 5;
+                    spawns->setTexture(texts[currentFrame]);
+                    animClock.restart();
+                }
+            }
+            else {
+                if (animClock.getElapsedTime().asSeconds() > frametime) {
+                    currentFrame++;
+                    if (currentFrame >= 7)
+                        currentFrame = 5;
+                    spawns->setTexture(texts[currentFrame]);
+                    animClock.restart();
+                }
+            }
+
+        }
+    }
+    void movement() {
+        if (!hasExploded && lifeClock.getElapsedTime().asSeconds() >= explosionTime) {
+            explode();
+            return;  // Stop moving after explosion
+        }
+        spawns->setScale({ 220.f / 995.f, 250.f / 1090.f });
+        spawns->move({ -1.5f, 0.0f });
+
+        if (animClock.getElapsedTime().asSeconds() > frametime) {
+            currentFrame++;
+            if (currentFrame >= 4)
+                currentFrame = 0;
+            spawns->setTexture(texts[currentFrame]);
+            animClock.restart();
+        }
+
+        if (spawns->getPosition().x > 750.f || spawns->getPosition().y > 550.f || spawns->getPosition().x <= 80.f) {
+            active = false;
+        }
+    }
+    void explode() {
+        hasExploded = true;
+        active = false;  // Remove the bomb
+        // TODO: Add explosion animation/effect here
+        // TODO: Deal damage to player if in range
+    }
+    void Draw(RenderWindow& window) {
+        if (active) {
+            window.draw(*spawns);
+        }
+    }
+    bool isActive() {
+        return active;
+    }
+    FloatRect getBound() {
+        return spawns->getGlobalBounds();
+    }
+    ~Bomb() {
+        delete spawns;
+        spawns = nullptr;
+    }
+    };
+
+void vectory(Bomb*& a, int* n, Bomb v) {
+    *n += 1;
+    Bomb* arr = new Bomb[*n];
+    for (int i = 0; i < *n; i++) {
+        if (i < *n - 1)
+            arr[i] = a[i];
+        else
+            arr[i] = v;
+    }
+    delete[] a;
+    a = nullptr;
+    a = arr;
+}
+
+class Gamakichi : public Mogera {
+    protected:
+    Sprite* boss;
+    Texture text[2];
+    Texture smoke[4];
+    Sprite* smokey[4];
+    float speed = 1.25f;
+    Bomb* spawnss;
+    bool mv1 = false;
+    float pausef = 0;
+    bool isSmoke = false;
+    bool smokeStart = false;
+    Clock smokeClock;
+    float smokeDuration = 3.0f;
+    public:
+    static int bossHp;
+        Gamakichi() {
+            text[0].loadFromFile("gamakichi/gamakichi_01.png");
+            text[1].loadFromFile("gamakichi/gamakichi_02.png");
+            boss = new Sprite(text[0]);
+            smoke[0].loadFromFile("gamakichi/smoke_01.png");
+            smoke[1].loadFromFile("gamakichi/smoke_02.png");
+            smoke[2].loadFromFile("gamakichi/smoke_03.png");
+            smoke[3].loadFromFile("gamakichi/smoke_04.png");
+            smokey[0] = new Sprite(smoke[0]);
+            smokey[1] = new Sprite(smoke[0]);
+            smokey[2] = new Sprite(smoke[0]);
+            smokey[3] = new Sprite(smoke[0]);
+            spawns = nullptr;
+            spawnCount = 0;
+    }
+
+        void movements(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db, string& username, int& lives, int& gems, int& score, int& levelNo) {
+        boss->setScale({1128/3500.f, 622.f/1200.f});
+        if (isSmoke == true && smokeClock.getElapsedTime().asSeconds() >= smokeDuration) {
+            isSmoke = false;
+        }
+        if(isSmoke == false){
+            if (mv1 == false) {
+            isSmoke = false;
+                boss->move({+0.f, +speed});
+                if (clock.getElapsedTime().asSeconds() > frametime) {
+                    bodyFrames++;
+                    if (bodyFrames >= 2)
+                        bodyFrames = 0;
+                    boss->setTexture(text[bodyFrames]);
+                    clock.restart();
+                }
+            }
+           if (mv1 == true) {
+           isSmoke = false;
+                boss->move({ +0.f, -speed });
+                if (clock.getElapsedTime().asSeconds() > frametime) {
+                    bodyFrames++;
+                    if (bodyFrames >= 2)
+                        bodyFrames = 0;
+                    boss->setTexture(text[bodyFrames]);
+                    clock.restart();
+                }
+            }
+        }
+            if (boss->getPosition().y >= 1050 && boss->getPosition().y <= 1100 && smokeStart == false) {
+            isSmoke = true;
+            smokeStart = true;
+                mv1 = true;
+                boss->setTexture(text[1]);
+                pausef = 60;
+                smokeClock.restart();
+            }
+            if (isSmoke == true) {
+                if (clock.getElapsedTime().asSeconds() > frametime) {
+                    bodyFrames++;
+                    if (bodyFrames >= 4)
+                        bodyFrames = 0;
+                    for (int i = 0; i < 4; i++) {
+                        smokey[i]->setTexture(smoke[bodyFrames]);
+                    }
+                    clock.restart();
+                }
+            }
+            if (boss->getPosition().y >= 0 && boss->getPosition().y <= 50) {
+                mv1 = false;
+                smokeStart = false;
+                boss->setTexture(text[1]);
+                pausef = 60;
+            }
+            if (spawnClock.getElapsedTime().asSeconds() > spawnInterval) {
+                spawnEnemy();
+                spawnClock.restart();
+            }
+
+
+            for (int i = 0; i < spawnCount; i++) {
+                spawnss[i].applyGravity(tiles, tileCount);
+                spawnss[i].movement();
+                if (play.boun().findIntersection(spawnss[i].getBound())) {
+                    db.saveProgress(username, levelNo, lives-1, gems, score);
+                    currentState = GameState::GameOver;
+                    break;
+                }
+            }
+
+
+            cleanupInactiveSpawns();
+    }
+
+        void spawnEnemy() {
+            Bomb newSpawn;
+            newSpawn.setPos(boss->getPosition().x, boss->getPosition().y);
+            vectory(spawnss, &spawnCount, newSpawn);
+        }
+
+        void cleanupInactiveSpawns() {
+
+            int activeCount = 0;
+            for (int i = 0; i < spawnCount; i++) {
+                if (spawnss[i].isActive()) {
+                    activeCount++;
+                }
+            }
+
+
+            if (activeCount == spawnCount) return;
+
+
+            Bomb* newSpawns = new Bomb[activeCount];
+            int index = 0;
+            for (int i = 0; i < spawnCount; i++) {
+                if (spawnss[i].isActive()) {
+                    newSpawns[index] = spawnss[i];
+                    index++;
+                }
+            }
+
+            delete[] spawnss;
+            spawnss = newSpawns;
+            spawnCount = activeCount;
+        }
+
+        void setPos(float x, float y, float xx, float yy) {
+            boss->setOrigin({ xx, yy });
+            boss->setPosition({ x, y });
+        }
+
+        void Draw(RenderWindow& window, Tiles* tiles, int tileCount) {
+        if(isSmoke != true)
+            window.draw(*boss);
+            for (int i = 0; i < spawnCount; i++) {
+                spawnss[i].Draw(window);
+            }
+            if (isSmoke == true) {
+                for (int i = 0; i < 4; i++) {
+                smokey[i]->setScale({330.f/870.f, 190.f/500.f});
+                    smokey[i]->setPosition({175.f+i*100.f, 540.f});
+                    window.draw(*smokey[i]);
+                }
+            }
+            
+        }
+
+        FloatRect boun() {
+            return boss->getGlobalBounds();
+        }
+
+        void setCol() {
+            boss->setColor(Color::Red);
+        }
+
+        void setNor() {
+            boss->setColor(Color::White);
+        }
+
+        ~Gamakichi() {
+        for(int i = 0; i < 4; i++)
+        delete smokey[i];
+            delete[] smokey;
+            delete boss;
+            boss = nullptr;
+        }
+};
+
+int Gamakichi::bossHp = 1500;
+
+//----------------------GAMAKICHI BOSS END---------------------
 
 struct EnemySpawnPoint { int row; int col; };
 
@@ -1850,8 +2211,23 @@ int main()
         // Handle error
     }
 
-    Text title(font);
-    Text prompt(font);
+
+    //-----------MOGERA BOSS-------------------
+    Mogera mogera;
+    float vx = 572.f/2.f;
+    float vy = 460.f/2.f;
+    mogera.setPos(650.f, 300.f, vx, vy);
+
+    //-----------GAMAKICHI BOSS-----------------
+    Gamakichi gamakichi;
+    float ux = 1130.f/2.f;
+    float uy = 620.f/2.f;
+    gamakichi.setPos(400.f, 500.f, ux, uy);
+
+    Text title(font);  // Pass font here
+    Text prompt(font); // Pass font here
+
+
     title.setString("SNOW BROS");
     title.setCharacterSize(100);
     title.setFillColor(Color::White);
@@ -2641,6 +3017,7 @@ int main()
         for (int i = 0; i < 4; i++) {
             if (!fooga[i].isAlive()) continue;
             if (!fooga[i].isFullyFrozen()) continue;
+            if (enemies[i].isRolling()) continue;
             if (play.boun().findIntersection(fooga[i].boun())) {
                 fooga[i].kick(play.getDirectionX());
                 score += 100;
@@ -2672,12 +3049,32 @@ int main()
         }
         // FOOGAS!!!!!!!!!
         for (int i = 0; i < 4; i++) {
+            if (!fooga[i].isAlive()) continue;
+            if (!fooga[i].isRolling()) continue;
             for (int j = 0; j < 4; j++) {
                 if (i == j) continue;
                 if (!fooga[j].isAlive()) continue;
                 if (fooga[j].isRolling()) continue;
                 if (fooga[i].boun().findIntersection(fooga[j].boun())) {
                     fooga[j].kill();
+                    score += 200;
+                    gems += 15;
+                }
+            }
+        }
+
+        //BOTOMS KILLING FOOGAS FRFR
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (!enemies[i].isAlive()) continue;
+            if (!enemies[i].isRolling()) continue;
+            for (int j = 0; j < 4; j++) {
+                if (i == j) continue;
+                if (!fooga[j].isAlive()) continue;
+                if (fooga[j].isRolling()) continue;
+                if (enemies[i].boun().findIntersection(fooga[j].boun())) {
+                    fooga[j].kill();
+                    score += 200;
+                    gems += 15;
                 }
             }
         }
@@ -2751,7 +3148,8 @@ int main()
         mover(MAX_ENEMIES, enemies, tilt, count);
         mover(4, fooga, tilt, count);
         //mover(2, tornado, tilt, count);
-        mogera.movement(tilt, count);
+        mogera.movement(tilt, count, play , db, username, lives, gems, score, levelNo);
+        gamakichi.movements(tilt, count, play , db, username, lives, gems, score, levelNo);
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
@@ -2789,12 +3187,17 @@ int main()
         Draw(MAX_ENEMIES, enemies, window);
         Draw(4, fooga, window);
         //Draw(2, tornado, window);
+        gamakichi.Draw(window, tilt, count);
         if(Mogera::bossHp > 0)
         mogera.Draw(window, tilt, count);
         //------------MOGERA DYING-------------------------------
-        else {
+        else if(Mogera::bossHp <= 0 && mogera.getDeath() == true) {
            mogera.setPos(-999.f,-999.f,0.f,0.f);
+           score += 5000;
+           mogera.setDead();
         }
+       else
+       score += 0;
         // Draw frozen overlays on top of enemies
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (!enemies[i].isAlive()) continue;
