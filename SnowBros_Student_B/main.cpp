@@ -14,46 +14,13 @@ using namespace sf;
 enum class GameState { Login, MainMenu, ModeSelect, Shop, Playing, Paused, LevelComplete, GameOver, GameComplete, Signup, FlashScreen, LevelSelect, Ranking, Victory, CharacterSelect };
 GameState currentState = GameState::FlashScreen;
 
-void addItem(Item**& itemArray, int& itemCount, Item* newItem) {
-    itemCount += 1;
-    Item** newArray = new Item * [itemCount];
-
-    for (int i = 0; i < itemCount; i++) {
-        if (i < itemCount - 1)
-            newArray[i] = itemArray[i];
-        else
-            newArray[i] = newItem;
-    }
-
-    delete[] itemArray;
-    itemArray = newArray;
-}
-
-void removeItem(Item**& itemArray, int& itemCount, int index) {
-    if (itemCount == 0) return;
-
-    Item** newArray = new Item * [itemCount - 1];
-    int newIndex = 0;
-
-    for (int i = 0; i < itemCount; i++) {
-        if (i != index) {
-            newArray[newIndex] = itemArray[i];
-            newIndex++;
-        }
-    }
-
-    delete[] itemArray;
-    itemArray = newArray;
-    itemCount -= 1;
-}
-
 // Global Power-up states
 bool hasSpeedBoost = false;
 bool hasSnowballPower = false;
 bool hasDistanceIncrease = false;
 bool hasBalloonMode = false;
 
-
+enum class GameState { Login, MainMenu, ModeSelect, Shop, Playing, Paused, LevelComplete, GameOver, GameComplete, Signup, FlashScreen, LevelSelect, Ranking, Victory, CharacterSelect };
 
 // Function declarations
 void mover(int n, Botom* other, Tiles* tiles, int tileCount);
@@ -87,23 +54,212 @@ bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileC
 
 
 
+    void Draw(RenderWindow& window) {
+        if (active) {
+            window.draw(*spawn);
+        }
+    }
 
+    ~MogeraChild() {
+        delete spawn;
+        spawn = nullptr;
+    }
+};
+
+
+void vectora(MogeraChild*& a, int* n, MogeraChild v) {
+    *n += 1;
+    MogeraChild* arr = new MogeraChild[*n];
+    for (int i = 0; i < *n; i++) {
+        if (i < *n - 1)
+            arr[i] = a[i];
+        else
+            arr[i] = v;
+    }
+    delete[] a;
+    a = nullptr;
+    a = arr;
+}
 
 //------------------------------------MOGERA BOSS-------------------------
 
+class Mogera {
+protected:
+    Sprite* bossChest;
+    Sprite* bossLeg;
+    Texture bodyText[3];
+    Texture legText[3];
+    int bodyFrames = 0;
+    int legFrames = 0;
+    float frametime = 0.15f;
+    Clock clock;
 
+   
+    MogeraChild* spawns;
+    int spawnCount;
+    Clock spawnClock;
+    float spawnInterval = 3.0f;  
+    bool isDead = false;
+
+public:
+static int bossHp;
+    Mogera() {
+        bodyText[0].loadFromFile("mogera/mogera_01.png");
+        bodyText[1].loadFromFile("mogera/mogera_02.png");
+        bodyText[2].loadFromFile("mogera/mogera_03.png");
+        legText[0].loadFromFile("mogera/mogera_leg_01.png");
+        legText[1].loadFromFile("mogera/mogera_leg_02.png");
+        legText[2].loadFromFile("mogera/mogera_leg_03.png");
+        bossChest = new Sprite(bodyText[0]);
+        bossLeg = new Sprite(legText[0]);
+
+        // Initialize spawn array
+        spawns = nullptr;
+        spawnCount = 0;
+    }
+
+    void movement(Tiles* tiles, int tileCount) {
+        int x = rand() % 10;
+        if (x == 1) {
+            bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
+            bossLeg->setScale({ 504.f / 1000.f, 118.f / 254.f });
+            bossChest->move({ 0.0f, 0.0f });
+            bossLeg->move({ 0.0f, 0.0f });
+
+            if (clock.getElapsedTime().asSeconds() > frametime) {
+                bodyFrames++;
+                if (bodyFrames >= 3)
+                    bodyFrames = 0;
+                bossChest->setTexture(bodyText[bodyFrames]);
+                bossLeg->setTexture(legText[bodyFrames]);
+                clock.restart();
+            }
+        }
+
+        if (bossLeg->getPosition().y >= 550.f) {
+            bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
+            bossLeg->setScale({ 504.f / 1000.f, 118.f / 254.f });
+            bossChest->move({ 0.0f, 0.0f });
+            bossLeg->move({ 0.0f, 0.0f });
+
+            if (clock.getElapsedTime().asSeconds() > frametime) {
+                bodyFrames++;
+                if (bodyFrames >= 3)
+                    bodyFrames = 0;
+                bossChest->setTexture(bodyText[bodyFrames]);
+                bossLeg->setTexture(legText[bodyFrames]);
+                clock.restart();
+            }
+        }
+
+       
+        if (spawnClock.getElapsedTime().asSeconds() > spawnInterval) {
+            spawnEnemy();
+            spawnClock.restart();
+        }
+
+       
+        for (int i = 0; i < spawnCount; i++) {
+        spawns[i].applyGravity(tiles, tileCount);
+            spawns[i].movement();
+        }
+
+       
+        cleanupInactiveSpawns();
+    }
+
+    void spawnEnemy() {
+        MogeraChild newSpawn;
+        float y = 0.0f;
+        int r = rand()%3;
+        if(r == 0)
+        y += 0.0f;
+        if(r == 1)
+        y += 42.85f*2;
+        if(r == 2)
+        y += 42.85f*4;
+        newSpawn.setPos(bossChest->getPosition().x, bossChest->getPosition().y+y);
+        vectora(spawns, &spawnCount, newSpawn);
+    }
+
+    void cleanupInactiveSpawns() {
+        // Count active spawns
+        int activeCount = 0;
+        for (int i = 0; i < spawnCount; i++) {
+            if (spawns[i].isActive()) {
+                activeCount++;
+            }
+        }
+
+        // If all are active, no cleanup needed
+        if (activeCount == spawnCount) return;
+
+        // Create new array with only active spawns
+        MogeraChild* newSpawns = new MogeraChild[activeCount];
+        int index = 0;
+        for (int i = 0; i < spawnCount; i++) {
+            if (spawns[i].isActive()) {
+                newSpawns[index] = spawns[i];
+                index++;
+            }
+        }
+
+        delete[] spawns;
+        spawns = newSpawns;
+        spawnCount = activeCount;
+    }
+
+    void setPos(float x, float y, float xx, float yy) {
+        bossChest->setOrigin({ xx, yy });
+        bossLeg->setOrigin({ xx, yy });
+        bossChest->setPosition({ x, y });
+        bossLeg->setPosition({ x, y + 205.7f });
+    }
+
+    void Draw(RenderWindow& window, Tiles* tiles, int tileCount) {
+        window.draw(*bossChest);
+        window.draw(*bossLeg);
+
+        // Draw all spawns
+        for (int i = 0; i < spawnCount; i++) {
+            spawns[i].Draw(window);
+        }
+    }
+
+    FloatRect boun() {
+        return bossChest->getGlobalBounds();
+    }
+
+    void setCol() {
+        bossChest->setColor(Color::Red);
+    }
+
+    void setNor() {
+        bossChest->setColor(Color::White);
+    }
+
+    void checkdead() {
+        if(bossHp <= 0)
+        isDead = true;
+    }
+
+    bool getDeath() {
+        return isDead;
+    }
+
+    ~Mogera() {
+        delete bossChest;
+        delete bossLeg;
+        bossChest = nullptr;
+        bossLeg = nullptr;
+        delete[] spawns;
+        spawns = nullptr;
+    }
+};
+
+int Mogera::bossHp = 900;
 
 bool snowballHitsMogera(Snowball& snowball, Mogera& boss) {
-    if (!snowball.active) return false;
-    if (snowball.boun().findIntersection(boss.boun())) {
-        boss.setCol();
-        Mogera::bossHp--;
-        return true;
-    }
-    return false;
-}
-
-bool snowballHitsGamakichi(Snowball& snowball, Gamakichi& boss) {
     if (!snowball.active) return false;
     if (snowball.boun().findIntersection(boss.boun())) {
         boss.setCol();
@@ -425,8 +581,10 @@ int main()
 
 
     //-----------MOGERA BOSS-------------------
-   
-    
+    Mogera mogera;
+    float vx = 572.f/2.f;
+    float vy = 460.f/2.f;
+    mogera.setPos(650.f, 300.f, vx, vy);
 
     //-----------GAMAKICHI BOSS-----------------
     Gamakichi gamakichi;
@@ -722,13 +880,17 @@ int main()
                             if (hoveredOption == 1) { 
                                 isMultiplayer = false; 
                                 lives = 3;
-                                currentState = GameState::LevelSelect; 
+                                cutsceneIndex = 1;
+                                cutsceneNextState = GameState::LevelSelect;
+                                currentState = GameState::Cutscene;
                             }
                             if (hoveredOption == 2) { 
                                 isMultiplayer = true; 
                                 lives = 3;
-                                lives2 = 3; 
-                                currentState = GameState::LevelSelect; 
+                                lives2 = 3;
+                                cutsceneIndex = 1;
+                                cutsceneNextState = GameState::LevelSelect;
+                                currentState = GameState::Cutscene;
                             }
                             if (hoveredOption == 3) currentState = GameState::Shop;
                             if (hoveredOption == 4) currentState = GameState::Ranking;
@@ -747,6 +909,44 @@ int main()
 
                 window.clear(Color::Black);
                 window.draw(mainMenuSprite);
+
+                // --- SNOWFLAKE PARTICLE SYSTEM ---
+                const int FLAKE_COUNT = 50;
+                static Texture snowTex;
+                static bool snowLoaded = false;
+                static float flakeX[FLAKE_COUNT], flakeY[FLAKE_COUNT];
+                static float flakeSpeed[FLAKE_COUNT], flakeScale[FLAKE_COUNT];
+                static float flakeAlpha[FLAKE_COUNT];
+
+                if (!snowLoaded) {
+                    snowTex.loadFromFile("Images/snowflake.png");
+                    for (int i = 0; i < FLAKE_COUNT; i++) {
+                        flakeX[i]     = (float)(rand() % 800);
+                        flakeY[i]     = (float)(rand() % 600);
+                        flakeSpeed[i] = 0.5f + (rand() % 15) / 10.f;
+                        flakeScale[i] = 0.03f + (rand() % 6) / 100.f;
+                        flakeAlpha[i] = 130.f + (float)(rand() % 80);
+                    }
+                    snowLoaded = true;
+                }
+
+                for (int i = 0; i < FLAKE_COUNT; i++) {
+                    flakeY[i] += flakeSpeed[i];
+
+                    if (flakeY[i] > 620.f) {
+                        flakeY[i] = -10.f;
+                        flakeX[i] = (float)(rand() % 800);
+                    }
+
+                    Sprite flake(snowTex);
+                    flake.setScale({ flakeScale[i], flakeScale[i] });
+                    flake.setPosition({ flakeX[i], flakeY[i] });
+                    flake.setColor(Color(255, 255, 255, (uint8_t)flakeAlpha[i]));
+                    window.draw(flake);
+                }
+                // --- END SNOWFLAKE ---
+
+
                 if (levelNo > 1) {
                     Text continueText(font);
                     continueText.setString("CONTINUE");
@@ -1120,8 +1320,10 @@ int main()
                     if (!event.has_value())
                         break;
 
-                    if (event->is<Event::Closed>())
+                    if (event->is<Event::Closed>()) {
+                        db.saveProgress(username, levelNo, lives, gems, score);
                         window.close();
+                    }
             
             if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                 if (keyPressed->code == Keyboard::Key::P || keyPressed->code == Keyboard::Key::Escape) {
@@ -1132,7 +1334,15 @@ int main()
                     if (levelNo > 10)
                         levelNo = 1;
                     LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                    spawnEnemies(enemies, levelNo);
+                    spawnFoogas(fooga);
                     play.setPos(12, 5);
+                    if (isMultiplayer) play2.setPos(12, 7);
+                }
+                // R = Reset position to spawn (unstuck)
+                if (keyPressed->code == Keyboard::Key::R) {
+                    play.setPos(12, 5);
+                    if (isMultiplayer) play2.setPos(12, 7);
                 }
                 if (lives > 0 && keyPressed->code == Keyboard::Key::J) { // P1 shoots with J
                     for (int i = 0; i < MAX_SNOWBALLS; i++) {
@@ -1379,10 +1589,10 @@ int main()
         mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo, isMultiplayer, lives2);
         gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo, isMultiplayer, lives2);
         //mover(2, tornado, tilt, count);
-        //if (mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo))
-            //currentState = GameState::GameOver;
-        //if (gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo))
-            //currentState = GameState::GameOver;
+        if (mogera.movement(tilt, count, play, db, username, lives, gems, score, levelNo))
+            currentState = GameState::GameOver;
+        if (gamakichi.movements(tilt, count, play, db, username, lives, gems, score, levelNo))
+            currentState = GameState::GameOver;
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
@@ -1420,14 +1630,16 @@ int main()
         Draw(MAX_ENEMIES, enemies, window);
         Draw(4, fooga, window);
         //Draw(2, tornado, window);
-        gamakichi.Draw(window, tilt, count);
-        if (Mogera::bossHp > 0)
-            mogera.Draw(window, tilt, count);
-        //------------MOGERA DYING-------------------------------
-        else if (Mogera::bossHp <= 0 && mogera.getDeath() == true) {
-            mogera.setPos(-999.f, -999.f, 0.f, 0.f);
-            score += 5000;
-            mogera.setDead(); // sets isDead=false so this only fires once
+        if (levelNo == 10) {
+            gamakichi.Draw(window, tilt, count);
+            if (Mogera::bossHp > 0)
+                mogera.Draw(window, tilt, count);
+            //------------MOGERA DYING-------------------------------
+            else if (Mogera::bossHp <= 0 && mogera.getDeath() == true) {
+                mogera.setPos(-999.f, -999.f, 0.f, 0.f);
+                score += 5000;
+                mogera.setDead(); // sets isDead=false so this only fires once
+            }
         }
         // Frozen overlays are now handled inside the Draw functions below
 
@@ -1537,11 +1749,9 @@ int main()
         if (allDead) {
             levelNo++;
             if (levelNo > 10) {
-                // GAME WON!
                 currentState = GameState::Victory;
                 levelNo = 1;
-            }
-            else {
+            } else {
                 db.saveProgress(username, levelNo, lives, gems, score);
 
                 // SPAWN NEW LEVEL
@@ -1632,7 +1842,10 @@ int main()
                 {
                     auto event = window.pollEvent();
                     if (!event.has_value()) break;
-                    if (event->is<Event::Closed>()) window.close();
+                    if (event->is<Event::Closed>()) {
+                        db.saveProgress(username, levelNo, lives, gems, score);
+                        window.close();
+                    }
                     if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
                         if (keyPressed->code == Keyboard::Key::Up) hoveredOption = (hoveredOption == 1) ? 3 : hoveredOption - 1;
                         if (keyPressed->code == Keyboard::Key::Down) hoveredOption = (hoveredOption == 3) ? 1 : hoveredOption + 1;
@@ -1643,7 +1856,10 @@ int main()
                                 previousState = GameState::Paused; // Mark where we came from
                                 currentState = GameState::Shop;
                             }
-                            else currentState = GameState::MainMenu;
+                            else {
+                                db.saveProgress(username, levelNo, lives, gems, score);
+                                currentState = GameState::MainMenu;
+                            }
                         }
                         if (keyPressed->code == Keyboard::Key::P || keyPressed->code == Keyboard::Key::Escape) {
                             currentState = GameState::Playing;
@@ -1722,7 +1938,69 @@ int main()
             }
             break;
 
+            case GameState::Cutscene:
+            {
+                static Texture csTexture;
+                static int loadedIndex = -1;
+
+                if (loadedIndex != cutsceneIndex) {
+                    string path = "Images/cutscenes/" + to_string(cutsceneIndex) + ".png";
+                    csTexture.loadFromFile(path);
+                    loadedIndex = cutsceneIndex;
+                }
+
+                Sprite csSprite(csTexture);
+                if (csTexture.getSize().x > 0)
+                    csSprite.setScale({ 800.f / csTexture.getSize().x, 600.f / csTexture.getSize().y });
+
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Enter || keyPressed->code == Keyboard::Key::Space) {
+                            // Handle multi-cutscene chains
+                            if (cutsceneIndex == 1) {
+                                // Cutscene 1 -> 2 -> MainMenu
+                                cutsceneIndex = 2;
+                                loadedIndex = -1; // force reload
+                            } else if (cutsceneIndex == 2) {
+                                // Cutscene 2 -> go to next state (LevelSelect when coming from Play)
+                                cutsceneIndex = 1; // reset for next playthrough
+                                loadedIndex = -1;
+                                currentState = cutsceneNextState;
+                            } else if (cutsceneIndex == 3) {
+                                // Cutscene 3 -> 4 -> Playing
+                                cutsceneIndex = 4;
+                                loadedIndex = -1;
+                            } else {
+                                // Cutscene 4, 5, 6 -> go to next state
+                                loadedIndex = -1;
+                                currentState = cutsceneNextState;
+                            }
+                        }
+                    }
+                }
+
+                window.clear(Color::Black);
+                window.draw(csSprite);
+
+                // "Press Enter to continue" prompt
+                Text csPrompt(font, "PRESS ENTER TO CONTINUE", 30);
+                csPrompt.setFillColor(Color(220, 220, 220));
+                csPrompt.setOutlineColor(Color::Black);
+                csPrompt.setOutlineThickness(2.f);
+                FloatRect cpB = csPrompt.getLocalBounds();
+                csPrompt.setOrigin({ cpB.position.x + cpB.size.x / 2.f, cpB.position.y + cpB.size.y / 2.f });
+                csPrompt.setPosition({ 400.f, 570.f });
+                window.draw(csPrompt);
+
+                window.display();
+            }
+            break;
+
             case GameState::Victory:
+
             {
                 while (true) {
                     auto event = window.pollEvent();
@@ -1738,32 +2016,37 @@ int main()
                 window.clear(Color(0, 60, 0)); // Dark Green for Victory
                 Text winText(font);
                 winText.setOutlineColor(Color::Black);
-                winText.setOutlineThickness(2.f);
+                winText.setOutlineThickness(3.f);
 
-                winText.setCharacterSize(60);
+                winText.setCharacterSize(40);
                 winText.setFillColor(Color::Yellow);
                 winText.setString("CONGRATULATIONS!");
-                FloatRect b1 = winText.getGlobalBounds();
-                winText.setPosition({ (800.f - b1.size.x) / 2.f, 100.f });
+                FloatRect b1 = winText.getLocalBounds();
+                winText.setOrigin({ b1.position.x + b1.size.x / 2.f, b1.position.y + b1.size.y / 2.f });
+                winText.setPosition({ 400.f, 150.f });
                 window.draw(winText);
 
-                winText.setCharacterSize(30);
+                winText.setCharacterSize(20);
                 winText.setFillColor(Color::White);
                 winText.setString("YOU SAVED THE SNOW WORLD!");
-                FloatRect b2 = winText.getGlobalBounds();
-                winText.setPosition({ (800.f - b2.size.x) / 2.f, 220.f });
+                FloatRect b2 = winText.getLocalBounds();
+                winText.setOrigin({ b2.position.x + b2.size.x / 2.f, b2.position.y + b2.size.y / 2.f });
+                winText.setPosition({ 400.f, 250.f });
                 window.draw(winText);
 
+                winText.setCharacterSize(20);
                 winText.setString("FINAL SCORE: " + to_string(score));
-                FloatRect b3 = winText.getGlobalBounds();
-                winText.setPosition({ (800.f - b3.size.x) / 2.f, 320.f });
+                FloatRect b3 = winText.getLocalBounds();
+                winText.setOrigin({ b3.position.x + b3.size.x / 2.f, b3.position.y + b3.size.y / 2.f });
+                winText.setPosition({ 400.f, 350.f });
                 window.draw(winText);
 
-                winText.setCharacterSize(22);
+                winText.setCharacterSize(10);
                 winText.setFillColor(Color(200, 200, 200));
                 winText.setString("PRESS ENTER FOR MAIN MENU");
-                FloatRect b4 = winText.getGlobalBounds();
-                winText.setPosition({ (800.f - b4.size.x) / 2.f, 500.f });
+                FloatRect b4 = winText.getLocalBounds();
+                winText.setOrigin({ b4.position.x + b4.size.x / 2.f, b4.position.y + b4.size.y / 2.f });
+                winText.setPosition({ 400.f, 480.f });
                 window.draw(winText);
 
                 window.display();
