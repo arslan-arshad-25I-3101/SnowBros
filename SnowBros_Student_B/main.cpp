@@ -1538,7 +1538,7 @@ static int bossHp;
         spawnCount = 0;
     }
 
-    void movement(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db,string& username, int& lives, int& gems, int& score, int& levelNo) {
+    void movement(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db,string& username, int& lives, int& gems, int& score, int& levelNo, bool& isMultiplayer, int& lives2) {
         int x = rand() % 10;
         if (x == 1) {
             bossChest->setScale({ 572.f / 1050.f, 460.f / 990.f });
@@ -1580,13 +1580,26 @@ static int bossHp;
 
        
         for (int i = 0; i < spawnCount; i++) {
+        bool playerHit = false;
+        //if (![i].isAlive() || enemies[i].isFrozen() || enemies[i].isDying()) continue;
+        if (play.boun().findIntersection(spawns[i].getBounds())) {
+            playerHit = true;
+        }
         spawns[i].applyGravity(tiles, tileCount);
             spawns[i].movement();
-            if (play.boun().findIntersection(spawns[i].getBounds())) {
-           
-                db.saveProgress(username, levelNo, lives-1, gems, score);
-                currentState = GameState::GameOver;
-                break;
+            if (playerHit) {
+                lives--;
+                if (lives > 0) {
+                    play.setPos(12, 5);
+                    play.startInvincibility();
+                }
+                else {
+                    play.setPos(-999, -999);
+                    if (!isMultiplayer || lives2 <= 0) {
+                        db.saveProgress(username, levelNo, 0, gems, score);
+                        currentState = GameState::GameOver;
+                    }
+                }
             }
         }
 
@@ -1897,7 +1910,7 @@ class Gamakichi : public Mogera {
             spawnCount = 0;
     }
 
-        void movements(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db, string& username, int& lives, int& gems, int& score, int& levelNo) {
+        void movements(Tiles* tiles, int tileCount, Player& play, DatabaseManager& db, string& username, int& lives, int& gems, int& score, int& levelNo, bool& isMultiplayer,int& lives2 ) {
         boss->setScale({1128/3500.f, 622.f/1200.f});
         if (isSmoke == true && smokeClock.getElapsedTime().asSeconds() >= smokeDuration) {
             isSmoke = false;
@@ -1958,12 +1971,25 @@ class Gamakichi : public Mogera {
 
 
             for (int i = 0; i < spawnCount; i++) {
+            bool playerHit = false;
+            if (play.boun().findIntersection(spawnss[i].getBound())) {
+                playerHit = true;
+            }
                 spawnss[i].applyGravity(tiles, tileCount);
                 spawnss[i].movement();
-                if (play.boun().findIntersection(spawnss[i].getBound())) {
-                    db.saveProgress(username, levelNo, lives-1, gems, score);
-                    currentState = GameState::GameOver;
-                    break;
+                if (playerHit) {
+                    lives--;
+                    if (lives > 0) {
+                        play.setPos(12, 5);
+                        play.startInvincibility();
+                    }
+                    else {
+                        play.setPos(-999, -999);
+                        if (!isMultiplayer || lives2 <= 0) {
+                            db.saveProgress(username, levelNo, 0, gems, score);
+                            currentState = GameState::GameOver;
+                        }
+                    }
                 }
             }
 
@@ -2047,6 +2073,19 @@ class Gamakichi : public Mogera {
 };
 
 int Gamakichi::bossHp = 1500;
+
+bool snowballHitsGamakichi(Snowball& snowball, Gamakichi& boss) {
+    if (!snowball.active) return false;
+    // No isFrozen() guard — additional hits stack more ice layers
+
+    if (snowball.getBounds().findIntersection(boss.boun())) {
+        boss.setCol();
+        Gamakichi::bossHp--;
+        return true;
+    }
+
+    return false;
+}
 
 //----------------------GAMAKICHI BOSS END---------------------
 
@@ -2201,9 +2240,7 @@ int main()
     spawnEnemies(enemies, levelNo); // already called
     spawnFoogas(fooga);
 
-    float vx = 572.f / 2.f;
-    float vy = 460.f / 2.f;
-    mogera.setPos(650.f, 300.f, vx, vy);
+  
     window.setFramerateLimit(60);
 
     Font font;
@@ -2213,7 +2250,7 @@ int main()
 
 
     //-----------MOGERA BOSS-------------------
-    Mogera mogera;
+   
     float vx = 572.f/2.f;
     float vy = 460.f/2.f;
     mogera.setPos(650.f, 300.f, vx, vy);
@@ -2979,11 +3016,17 @@ int main()
             }
         }
 
-        //FOR MOGERA
+        //---------------------FOR MOGERA--------------------
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             if(!snowballs[i].active)
             continue;
             snowballHitsMogera(snowballs[i], mogera);
+        }
+        //---------------FOR GAMAKICHI------------------
+        for (int i = 0; i < MAX_SNOWBALLS; i++) {
+            if (!snowballs[i].active)
+                continue;
+            snowballHitsGamakichi(snowballs[i], gamakichi);
         }
         // --- UPDATED LEVEL COMPLETION LOGIC IS BELOW IN THE DRAWING SECTION ---
 
@@ -3148,8 +3191,8 @@ int main()
         mover(MAX_ENEMIES, enemies, tilt, count);
         mover(4, fooga, tilt, count);
         //mover(2, tornado, tilt, count);
-        mogera.movement(tilt, count, play , db, username, lives, gems, score, levelNo);
-        gamakichi.movements(tilt, count, play , db, username, lives, gems, score, levelNo);
+        mogera.movement(tilt, count, play , db, username, lives, gems, score, levelNo, isMultiplayer, lives2);
+        gamakichi.movements(tilt, count, play , db, username, lives, gems, score, levelNo, isMultiplayer, lives2);
         //mover(opt,botom);
         Gravity(MAX_ENEMIES, enemies, tilt, count);
         Gravity(4, fooga, tilt, count);
