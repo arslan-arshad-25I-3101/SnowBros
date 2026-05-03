@@ -1154,6 +1154,10 @@ bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileC
 class Player : public Botom {
 protected:
     float movementSpeed = 2.25f;
+    bool invincible = false;
+    Clock invincibilityClock;
+    Clock blinkClock;
+    bool visible = true;
 
 public:
     Player() {
@@ -1170,6 +1174,33 @@ public:
         enemy->setScale({ playerScale, playerScale });
         enemy->setOrigin({ tex[0].getSize().x / 2.f, tex[0].getSize().y / 2.f });
     }
+
+    void startInvincibility() {
+        invincible = true;
+        invincibilityClock.restart();
+        blinkClock.restart();
+    }
+
+    void updateInvincibility() {
+        if (!invincible) {
+            enemy->setColor(Color::White);
+            return;
+        }
+
+        if (invincibilityClock.getElapsedTime().asSeconds() > 4.f) {
+            invincible = false;
+            enemy->setColor(Color::White);
+            return;
+        }
+
+        if (blinkClock.getElapsedTime().asSeconds() > 0.1f) {
+            visible = !visible;
+            enemy->setColor(visible ? Color::White : Color(255, 255, 255, 80));
+            blinkClock.restart();
+        }
+    }
+
+    bool isInvincible() const { return invincible; }
 
     void setSpeed(float s) { movementSpeed = s; }
 
@@ -1192,9 +1223,9 @@ public:
         }
     }
 
-    void move(Keyboard::Key key, Tiles* tiles, int tileCount) {
+    void move(Keyboard::Key left, Keyboard::Key right, Keyboard::Key jump, Tiles* tiles, int tileCount) {
 
-        if (key == Keyboard::Key::A) {
+        if (Keyboard::isKeyPressed(left)) {
             enemy->move({ -movementSpeed, -0.0f });
             if (checkCollision(tiles, tileCount)) {
                 enemy->move({ movementSpeed, -0.0f }); // undo movement
@@ -1209,7 +1240,7 @@ public:
                 }
             }
         }
-        if (key == Keyboard::Key::D) {
+        if (Keyboard::isKeyPressed(right)) {
             enemy->move({ +movementSpeed, -0.0f });
             if (checkCollision(tiles, tileCount)) {
                 enemy->move({ -movementSpeed, -0.0f }); // undo movement
@@ -1225,10 +1256,9 @@ public:
             }
         }
 
-        // W key just LAUNCHES the player upward
-        if (key == Keyboard::Key::W) {
-            if (onGround) {             // can't double jump
-                velocityY = jumpForce;  // -10.f  shoots upward
+        if (Keyboard::isKeyPressed(jump)) {
+            if (onGround) {
+                velocityY = jumpForce;
                 onGround = false;
             }
         }
@@ -1705,63 +1735,97 @@ void spawnEnemies(Botom* enemies, int levelNo) {
     }
 }
 
-GameState currentState = GameState::FlashScreen;
-
 int main()
 {
-string username, password;
+    RenderWindow window(VideoMode({ 800u, 600u }), "SNOW BROS");
+    window.setFramerateLimit(60);
+    window.setKeyRepeatEnabled(false);
 
-cout<<"Do you want to login or register? (1 for login, 2 for register)" <<endl;
-int choice;
-cin>>choice;
+    struct InputField {
+        RectangleShape rect;
+        Text label;
+        Text content;
+        string value;
+        bool focused = false;
+        bool isPassword = false;
 
-cout<<"Enter your username: " <<endl;
-cin>>username;
-cout<<"Enter your password: " <<endl;
-cin>>password;
+        InputField(Font& font, string lbl, Vector2f pos, bool pass = false) 
+            : label(font), content(font) {
+            isPassword = pass;
+            rect.setSize({ 300.f, 40.f });
+            rect.setPosition(pos);
+            rect.setFillColor(Color(50, 50, 50));
+            rect.setOutlineThickness(2.f);
+            rect.setOutlineColor(Color::White);
 
+            label.setString(lbl);
+            label.setCharacterSize(20);
+            label.setFillColor(Color::Yellow);
+            label.setPosition({ pos.x, pos.y - 30.f });
+
+            content.setCharacterSize(24);
+            content.setFillColor(Color::White);
+            content.setPosition({ pos.x + 10.f, pos.y + 5.f });
+        }
+
+        void handleInput(uint32_t unicode) {
+            if (!focused) return;
+            if (unicode == 8) { // Backspace
+                if (!value.empty()) value.pop_back();
+            }
+            else if (unicode >= 32 && unicode < 127) {
+                if (value.length() < 15) value += static_cast<char>(unicode);
+            }
+
+            if (isPassword) {
+                string masked(value.length(), '*');
+                content.setString(masked);
+            } else {
+                content.setString(value);
+            }
+        }
+
+        void update() {
+            rect.setOutlineColor(focused ? Color::Cyan : Color::White);
+            rect.setOutlineThickness(focused ? 3.f : 2.f);
+        }
+
+        void draw(RenderWindow& win) {
+            win.draw(rect);
+            win.draw(label);
+            win.draw(content);
+        }
+
+        bool contains(Vector2f mPos) {
+            return rect.getGlobalBounds().contains(mPos);
+        }
+    };
+
+    string username, password;
     DatabaseManager db;
-    ShopManager shop; // Our new shop manager!
+    ShopManager shop;
+    Mogera mogera;
 
-    int lives = 2, gems = 100, score = 0, count = 0; // Starting with 100 gems for testing
+    int lives = 3, gems = 100, score = 0, count = 0;
     int levelNo = 1;
+    bool loggedIn = false;
+    bool isMultiplayer = false;
+    int lives2 = 3;
 
-    // Timers for shop items
     Clock speedBoostTimer;
     Clock balloonTimer;
-switch(choice){
-    case 1:
-        if(db.verifyLogin(username, password)){
-            db.LoadUser(username, levelNo, lives, gems, score);
-        }
-        else {
-            cout<<"Your username or password is incorrect or you are not registered.\n";
-            //return 0;
-        }
-    break;
-    
-    case 2:
-        db.registerUser(username, password);
-    break;
-    
-    default:
-        cout<<"Invalid choice. Please try again." <<endl;
-    break;
-}
-    
-    
-    RenderWindow window(VideoMode({ 800u, 600u }), "HOPE");
 
+    GameState currentState = GameState::Login;
     GameState previousState = GameState::MainMenu;
     Level currentLevel;
     Texture bgTex;
     Sprite background(bgTex);
     Tiles* tilt = nullptr;
-    
 
     LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
 
     Player play;
+    Player play2;
     const int MAX_ENEMIES = 6;
     Botom enemies[MAX_ENEMIES];
 
@@ -1770,78 +1834,237 @@ switch(choice){
     Snowball snowballs[MAX_SNOWBALLS];
     play.setPos(12, 5);
 
-
     //------------- Foogas ---------------
     int num = 4;
     Fooga fooga[4];
+    spawnEnemies(enemies, levelNo); // already called
     spawnFoogas(fooga);
+
+    float vx = 572.f / 2.f;
+    float vy = 460.f / 2.f;
+    mogera.setPos(650.f, 300.f, vx, vy);
     window.setFramerateLimit(60);
 
     Font font;
     if (!font.openFromFile("Fonts/snow-bros.ttf")) {
-        // Fallback or error handling could go here
+        // Handle error
     }
 
-    Mogera mogera;
-    float vx = 572.f/2.f;
-    float vy = 460.f/2.f;
-    mogera.setPos(650.f, 300.f, vx, vy);
-
-    Text title(font);  // Pass font here
-Text prompt(font); // Pass font here
-
-
+    Text title(font);
+    Text prompt(font);
     title.setString("SNOW BROS");
     title.setCharacterSize(100);
     title.setFillColor(Color::White);
     title.setStyle(Text::Bold);
-    // Center title (approximate for 800x600)
     title.setPosition({ 150.f, 150.f });
-
-
 
     prompt.setString("Press ENTER to Start");
     prompt.setCharacterSize(30);
     prompt.setFillColor(Color::Yellow);
     prompt.setPosition({ 250.f, 400.f });
 
-    //flash screen  
-    Texture flashTexture;
-    if (!flashTexture.loadFromFile("Images/Flash_Screen.png")) {
-        cout<<" FLASH SCREEN WALI IMAGE NHI HAI NOOBn\n";
-        return -1;
-    }
-    Sprite flashSprite(flashTexture);
-    float scaleX = 800.f / flashTexture.getSize().x;
-    float scaleY = 600.f / flashTexture.getSize().y;
-    flashSprite.setScale({scaleX, scaleY});
+    Texture flashTexture, mainMenuTexture, shopTexture;
+    flashTexture.loadFromFile("Images/Flash_Screen.png");
+    mainMenuTexture.loadFromFile("Images/main_menu.png");
+    shopTexture.loadFromFile("Images/shop.png");
 
-    //main menu 
-    Texture mainMenuTexture;
-    if (!mainMenuTexture.loadFromFile("Images/main_menu.png")) {
-        // This handles if the image is missing
-        cout<<" MAIN MENU WALI IMAGE NHI HAI NOOB\n";
-        return -1;
-    }
-    Sprite mainMenuSprite(mainMenuTexture);
-    float mainMenuScaleX = 800.f / mainMenuTexture.getSize().x;
-    float mainMenuScaleY = 600.f / mainMenuTexture.getSize().y;
-    mainMenuSprite.setScale({mainMenuScaleX, mainMenuScaleY});
+    Sprite flashSprite(flashTexture), mainMenuSprite(mainMenuTexture), shopSprite(shopTexture);
+    flashSprite.setScale({ 800.f / flashTexture.getSize().x, 600.f / flashTexture.getSize().y });
+    mainMenuSprite.setScale({ 800.f / mainMenuTexture.getSize().x, 600.f / mainMenuTexture.getSize().y });
+    shopSprite.setScale({ 800.f / shopTexture.getSize().x, 600.f / shopTexture.getSize().y });
 
-    /// SHOP Screen
-    Texture shopTexture;
-    if (!shopTexture.loadFromFile("Images/shop.png")) {
-
-        cout<<" SHOP SCREEN WALI IMAGE NHI HAI NOOB\n";
-        return -1;
-    }
-    Sprite shopSprite(shopTexture);
-    float shopScaleX = 800.f / shopTexture.getSize().x;
-    float shopScaleY = 600.f / shopTexture.getSize().y;
-    shopSprite.setScale({shopScaleX, shopScaleY});
     while (window.isOpen())
     {
         switch (currentState) {
+            case GameState::Login:
+            {
+                static InputField userField(font, "Username", { 250.f, 200.f });
+                static InputField passField(font, "Password", { 250.f, 280.f }, true);
+                static string errorMsgText = "";
+                static Color errorColor = Color::Red;
+
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+
+                    if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
+                        Vector2f mPos = window.mapPixelToCoords(Mouse::getPosition(window));
+                        userField.focused = userField.contains(mPos);
+                        passField.focused = passField.contains(mPos);
+
+                        // Detection for Login Button
+                        RectangleShape btn({ 300.f, 45.f });
+                        btn.setPosition({ 250.f, 380.f });
+                        if (btn.getGlobalBounds().contains(mPos)) {
+                            if (db.verifyLogin(userField.value, passField.value)) {
+                                username = userField.value;
+                                db.LoadUser(username, levelNo, lives, gems, score);
+                                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                                spawnEnemies(enemies, levelNo);
+                                spawnFoogas(fooga);
+                                play.setPos(12, 5);
+                                currentState = GameState::FlashScreen;
+                                errorMsgText = "";
+                            } else errorMsgText = "Invalid Credentials!";
+                        }
+
+                        // Detection for Signup Link
+                        Text link(font, "Don't have an account? SIGNUP", 18);
+                        link.setPosition({ 250.f, 450.f });
+                        if (link.getGlobalBounds().contains(mPos)) {
+                            currentState = GameState::Signup;
+                            errorMsgText = "";
+                        }
+                    }
+
+                    if (const auto* textEntered = event->getIf<Event::TextEntered>()) {
+                        userField.handleInput(textEntered->unicode);
+                        passField.handleInput(textEntered->unicode);
+                    }
+
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Tab) {
+                            userField.focused = !userField.focused;
+                            passField.focused = !passField.focused;
+                        }
+                        if (keyPressed->code == Keyboard::Key::Enter) {
+                            if (db.verifyLogin(userField.value, passField.value)) {
+                                username = userField.value;
+                                db.LoadUser(username, levelNo, lives, gems, score);
+                                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                                spawnEnemies(enemies, levelNo);
+                                spawnFoogas(fooga);
+                                play.setPos(12, 5);
+                                currentState = GameState::FlashScreen;
+                            } else {
+                                errorMsgText = "Invalid Credentials!";
+                            }
+                        }
+                    }
+                }
+
+                userField.update();
+                passField.update();
+
+                window.clear(Color(20, 20, 40));
+                
+                Text loginTitle(font, "USER LOGIN", 40);
+                loginTitle.setFillColor(Color::White);
+                FloatRect ltBounds = loginTitle.getGlobalBounds();
+                loginTitle.setPosition({ (800.f - ltBounds.size.x) / 2.f, 80.f });
+                window.draw(loginTitle);
+
+                userField.draw(window);
+                passField.draw(window);
+
+                if (!errorMsgText.empty()) {
+                    Text err(font, errorMsgText, 18);
+                    err.setFillColor(errorColor);
+                    FloatRect eb = err.getGlobalBounds();
+                    err.setPosition({ (800.f - eb.size.x) / 2.f, 340.f });
+                    window.draw(err);
+                }
+
+                // Login Button
+                RectangleShape btn({ 300.f, 45.f });
+                btn.setPosition({ 250.f, 380.f });
+                btn.setFillColor(Color(0, 150, 0));
+                window.draw(btn);
+                Text btnTxt(font, "LOGIN", 24);
+                FloatRect lbBounds = btnTxt.getGlobalBounds();
+                btnTxt.setPosition({ 250.f + (300.f - lbBounds.size.x) / 2.f, 388.f });
+                window.draw(btnTxt);
+
+                Text link(font, "Don't have an account? SIGNUP", 18);
+                link.setFillColor(Color::Cyan);
+                FloatRect lnBounds = link.getGlobalBounds();
+                link.setPosition({ (800.f - lnBounds.size.x) / 2.f, 450.f });
+                window.draw(link);
+
+                window.display();
+            }
+            break;
+
+            case GameState::Signup:
+            {
+                static InputField userField(font, "New Username", { 250.f, 200.f });
+                static InputField passField(font, "New Password", { 250.f, 280.f }, true);
+                static string msg = "";
+
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+
+                    if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
+                        Vector2f mPos = window.mapPixelToCoords(Mouse::getPosition(window));
+                        userField.focused = userField.contains(mPos);
+                        passField.focused = passField.contains(mPos);
+
+                        // Detection for Register Button
+                        RectangleShape btn({ 300.f, 45.f });
+                        btn.setPosition({ 250.f, 380.f });
+                        if (btn.getGlobalBounds().contains(mPos)) {
+                            if (userField.value.length() > 2 && passField.value.length() > 2) {
+                                if (db.registerUser(userField.value, passField.value)) {
+                                    currentState = GameState::Login;
+                                    msg = "Success! Please Login.";
+                                } else msg = "User already exists!";
+                            } else msg = "Too short!";
+                        }
+
+                        // Detection for Login Link
+                        Text link(font, "Already have an account? LOGIN", 18);
+                        link.setPosition({ 250.f, 450.f });
+                        if (link.getGlobalBounds().contains(mPos)) {
+                            currentState = GameState::Login;
+                        }
+                    }
+                    if (const auto* textEntered = event->getIf<Event::TextEntered>()) {
+                        userField.handleInput(textEntered->unicode);
+                        passField.handleInput(textEntered->unicode);
+                    }
+                }
+
+                window.clear(Color(40, 20, 20));
+                Text regTitle(font, "CREATE ACCOUNT", 40);
+                regTitle.setFillColor(Color::White);
+                FloatRect rtBounds = regTitle.getGlobalBounds();
+                regTitle.setPosition({ (800.f - rtBounds.size.x) / 2.f, 80.f });
+                window.draw(regTitle);
+
+                userField.update(); passField.update();
+                userField.draw(window); passField.draw(window);
+
+                RectangleShape btn({ 300.f, 45.f });
+                btn.setPosition({ 250.f, 380.f });
+                btn.setFillColor(Color(0, 100, 200));
+                window.draw(btn);
+                Text btnTxt(font, "REGISTER", 24);
+                FloatRect rbBounds = btnTxt.getGlobalBounds();
+                btnTxt.setPosition({ 250.f + (300.f - rbBounds.size.x) / 2.f, 388.f });
+                window.draw(btnTxt);
+
+                Text link(font, "Already have an account? LOGIN", 18);
+                link.setFillColor(Color::Yellow);
+                FloatRect slBounds = link.getGlobalBounds();
+                link.setPosition({ (800.f - slBounds.size.x) / 2.f, 450.f });
+                window.draw(link);
+
+
+
+                if (!msg.empty()) {
+                    Text t(font, msg, 18);
+                    t.setFillColor(Color::White);
+                    t.setPosition({ 250.f, 340.f });
+                    window.draw(t);
+                }
+
+                window.display();
+            }
+            break;
+
             case GameState::FlashScreen:
             {
                 while (true)
@@ -1906,8 +2129,17 @@ Text prompt(font); // Pass font here
 
                     if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
                         if (mousePressed->button == Mouse::Button::Left) {
-                            if (hoveredOption == 1) currentState = GameState::CharacterSelect;
-                            if (hoveredOption == 2) { /* Multiplayer */ }
+                            if (hoveredOption == 1) { 
+                                isMultiplayer = false; 
+                                lives = 3;
+                                currentState = GameState::LevelSelect; 
+                            }
+                            if (hoveredOption == 2) { 
+                                isMultiplayer = true; 
+                                lives = 3;
+                                lives2 = 3; 
+                                currentState = GameState::LevelSelect; 
+                            }
                             if (hoveredOption == 3) currentState = GameState::Shop;
                             if (hoveredOption == 4) currentState = GameState::Ranking;
                             if (hoveredOption == 5) window.close(); 
@@ -1916,6 +2148,7 @@ Text prompt(font); // Pass font here
                                 spawnEnemies(enemies, levelNo);
                                 spawnFoogas(fooga);
                                 play.setPos(12, 5);
+                                if (isMultiplayer) play2.setPos(12, 7);
                                 currentState = GameState::Playing;
                             }
                         }
@@ -2078,6 +2311,85 @@ Text prompt(font); // Pass font here
             }
             break;
 
+            case GameState::LevelSelect:
+            {
+                Vector2f mousePos = window.mapPixelToCoords(Mouse::getPosition(window));
+                Vector2i rawMouse = Mouse::getPosition(window);
+
+                int hoveredLevel = 0;
+
+                // Manual Coordinates provided by USER
+                float xCoords[] = { 165.f, 285.f, 401.f, 517.f, 634.f };
+                float yRows[] = { 280.f-20.f, 405.f-20.f };
+
+                FloatRect levelButtons[10];
+                for (int i = 0; i < 10; i++) {
+                    float x = xCoords[i % 5];
+                    float y = yRows[i / 5];
+                    // Create a clickable area around the text center
+                    levelButtons[i] = FloatRect({ x - 25.f, y - 25.f }, { 50.f, 50.f });
+                    if (levelButtons[i].contains(mousePos)) hoveredLevel = i + 1;
+                }
+
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+                    
+                    if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
+                        if (mousePressed->button == Mouse::Button::Left && hoveredLevel > 0) {
+                            levelNo = hoveredLevel;
+                            LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                            spawnEnemies(enemies, levelNo);
+                            spawnFoogas(fooga);
+                            play.setPos(12, 5);
+                            lives = 3;
+                            if (isMultiplayer) {
+                                play2.setPos(12, 7);
+                                lives2 = 3;
+                            }
+                            currentState = GameState::Playing;
+                        }
+                    }
+
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Escape) currentState = GameState::MainMenu;
+                    }
+                }
+
+                // --- LEVEL SELECT COORDINATE HELPER (Console) ---
+                cout << "LEVEL SELECT Mouse Mapped: " << (int)mousePos.x << "," << (int)mousePos.y 
+                     << " | Raw: " << rawMouse.x << "," << rawMouse.y << "\r" << flush;
+
+                window.clear(Color::Black);
+
+                // Optimization: Load background texture once
+                static Texture levelSelectTex;
+                static bool texLoaded = false;
+                if (!texLoaded) {
+                    levelSelectTex.loadFromFile("Images/level_selection.png");
+                    texLoaded = true;
+                }
+                Sprite levelSelectSprite(levelSelectTex);
+                levelSelectSprite.setScale({ 800.f / levelSelectSprite.getGlobalBounds().size.x, 600.f / levelSelectSprite.getGlobalBounds().size.y });
+                window.draw(levelSelectSprite);
+
+                // Draw Level Numbers
+                for (int i = 0; i < 10; i++) {
+                    Text num(font, to_string(i + 1), 40);
+                    num.setFillColor(hoveredLevel == i + 1 ? Color::Green : Color::Yellow);
+                    num.setOutlineColor(Color::Black);
+                    num.setOutlineThickness(2.f);
+                    
+                    FloatRect nb = num.getGlobalBounds();
+                    // Center the number on the user-provided X,Y
+                    num.setPosition({ xCoords[i % 5] - nb.size.x / 2.f, yRows[i / 5] - nb.size.y / 2.f - 5.f });
+                    window.draw(num);
+                }
+
+                window.display();
+            }
+            break;
             case GameState::Shop:
             {
                 // Define Hitboxes
@@ -2110,14 +2422,16 @@ Text prompt(font); // Pass font here
                         if (mousePressed->button == Mouse::Button::Left) {
                             if (shopHover == 1) {
                                 if (shop.buyExtraLife(gems, lives)) {
-                                    cout << "Purchased Extra Life! Lives: " << lives << endl;
+                                    if (isMultiplayer) lives2++;
+                                    cout << "Purchased Extra Life! Lives: " << lives << " P2: " << lives2 << endl;
                                 }
                             }
                             else if (shopHover == 2) {
                                 if (shop.buySpeedBoost(gems, hasSpeedBoost)) {
                                     cout << "Speed Boost Activated!" << endl;
-                                    play.setSpeed(3.5f); // Set high speed
-                                    speedBoostTimer.restart(); // Start 30s timer
+                                    play.setSpeed(3.5f);
+                                    if (isMultiplayer) play2.setSpeed(3.5f);
+                                    speedBoostTimer.restart();
                                 }
                             }
                             else if (shopHover == 3) {
@@ -2133,7 +2447,8 @@ Text prompt(font); // Pass font here
                             else if (shopHover == 5) {
                                 if (shop.buyBalloonMode(gems, hasBalloonMode)) {
                                     cout << "Balloon Mode Activated!" << endl;
-                                    play.setGravity(0.25f); // Half gravity
+                                    play.setGravity(0.25f);
+                                    if (isMultiplayer) play2.setGravity(0.25f);
                                     balloonTimer.restart();
                                 }
                             }
@@ -2148,8 +2463,20 @@ Text prompt(font); // Pass font here
                     }
                 }
 
-                // --- SHOP COORDINATE HELPER ---
-                // cout << "SHOP Mouse X: " << mousePos.x << " | Mouse Y: " << mousePos.y << "\r" << flush;
+                // --- SHOP COORDINATE HELPER (Console) ---
+                Vector2i rawMouse = Mouse::getPosition(window);
+                cout << "SHOP Mouse Mapped: " << (int)mousePos.x << "," << (int)mousePos.y 
+                     << " | Raw: " << rawMouse.x << "," << rawMouse.y << "\r" << flush;
+
+                // --- SHOP COORDINATE HELPER (On-Screen) ---
+                string coordStr = "M: " + to_string((int)mousePos.x) + "," + to_string((int)mousePos.y) + 
+                                 "\nR: " + to_string(rawMouse.x) + "," + to_string(rawMouse.y);
+                Text coordText(font, coordStr, 12);
+                coordText.setFillColor(Color::Green);
+                coordText.setOutlineColor(Color::Black);
+                coordText.setOutlineThickness(1.f);
+                coordText.setPosition({ mousePos.x + 15.f, mousePos.y + 15.f });
+                window.draw(coordText);
 
                 window.clear(Color::Black);
                 window.draw(shopSprite);
@@ -2157,9 +2484,9 @@ Text prompt(font); // Pass font here
                 // Draw Gem Count
                 Text gemText(font);
                 gemText.setString("GEMS: " + to_string(gems));
-                gemText.setCharacterSize(30);
+                gemText.setCharacterSize(16);
                 gemText.setFillColor(Color::Yellow);
-                gemText.setPosition({ 581.f,388.f }); // Position based on your coords 581, 388
+                gemText.setPosition({ 600.f,63.f }); // Position based on your coords 581, 388
                 window.draw(gemText);
 
                 // Draw Selector snowball on hover
@@ -2180,12 +2507,14 @@ Text prompt(font); // Pass font here
                 // Check Power-up Timers
                 if (hasSpeedBoost && speedBoostTimer.getElapsedTime().asSeconds() > 30.f) {
                     hasSpeedBoost = false;
-                    play.setSpeed(2.25f); // Reset to normal speed
+                    play.setSpeed(2.0f);
+                    if (isMultiplayer) play2.setSpeed(2.0f);
                     cout << "Speed Boost Expired!" << endl;
                 }
-                if (hasBalloonMode && balloonTimer.getElapsedTime().asSeconds() > 30.f) {
+                if (hasBalloonMode && balloonTimer.getElapsedTime().asSeconds() > 15.f) {
                     hasBalloonMode = false;
-                    play.setGravity(0.5f); // Reset to normal gravity
+                    play.setGravity(0.5f);
+                    if (isMultiplayer) play2.setGravity(0.5f);
                     cout << "Balloon Mode Expired!" << endl;
                 }
 
@@ -2209,8 +2538,7 @@ Text prompt(font); // Pass font here
                     LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
                     play.setPos(12, 5);
                 }
-                if (keyPressed->code == Keyboard::Key::J) {
-                    // Reuse first inactive snowball from fixed pool
+                if (lives > 0 && keyPressed->code == Keyboard::Key::J) { // P1 shoots with J
                     for (int i = 0; i < MAX_SNOWBALLS; i++) {
                         if (!snowballs[i].active) {
                             snowballs[i].spawn(play.getPosition().x, play.getPosition().y, play.getDirectionX());
@@ -2218,22 +2546,34 @@ Text prompt(font); // Pass font here
                         }
                     }
                 }
+                if (isMultiplayer && lives2 > 0 && keyPressed->code == Keyboard::Key::K) { // P2 shoots with K
+                    for (int i = 0; i < MAX_SNOWBALLS; i++) {
+                        if (!snowballs[i].active) {
+                            snowballs[i].spawn(play2.getPosition().x, play2.getPosition().y, play2.getDirectionX());
+                            break;
+                        }
+                    }
+                }
             }
         }
 
-        if (Keyboard::isKeyPressed(Keyboard::Key::A)) {
-            play.move(Keyboard::Key::A, tilt, count);
+        // Player 1 Controls (WASD)
+        if (lives > 0) {
+            play.move(Keyboard::Key::A, Keyboard::Key::D, Keyboard::Key::W, tilt, count);
         }
-        if (Keyboard::isKeyPressed(Keyboard::Key::D)) {
-            play.move(Keyboard::Key::D, tilt, count);
-        }
-        if (Keyboard::isKeyPressed(Keyboard::Key::W)) {
-            play.move(Keyboard::Key::W, tilt, count);
+        
+        // Player 2 Controls (Arrows)
+        if (isMultiplayer && lives2 > 0) {
+            play2.move(Keyboard::Key::Left, Keyboard::Key::Right, Keyboard::Key::Up, tilt, count);
         }
 
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             snowballs[i].update(tilt, count);
         }
+
+        // Shooting logic (Events)
+        // This was already inside the event loop, let's update it there too.
+
 
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             if (!snowballs[i].active){
@@ -2286,22 +2626,29 @@ Text prompt(font); // Pass font here
         for (int i = 0; i < MAX_ENEMIES; i++) {
             if (!enemies[i].isAlive()) continue;
             if (!enemies[i].isFullyFrozen()) continue;
-            if (enemies[i].isRolling()) continue;  // already rolling
+            if (enemies[i].isRolling()) continue;
 
             if (play.boun().findIntersection(enemies[i].boun())) {
                 enemies[i].kick(play.getDirectionX());
                 score += 100;
-				gems += 10;
+                gems += 10;
+            } else if (isMultiplayer && lives2 > 0 && play2.boun().findIntersection(enemies[i].boun())) {
+                enemies[i].kick(play2.getDirectionX());
+                score += 100;
+                gems += 10;
             }
-
         }
-        //fooga idk
         for (int i = 0; i < 4; i++) {
-            //for fooga gng
             if (!fooga[i].isAlive()) continue;
             if (!fooga[i].isFullyFrozen()) continue;
             if (play.boun().findIntersection(fooga[i].boun())) {
                 fooga[i].kick(play.getDirectionX());
+                score += 100;
+                gems += 10;
+            } else if (isMultiplayer && lives2 > 0 && play2.boun().findIntersection(fooga[i].boun())) {
+                fooga[i].kick(play2.getDirectionX());
+                score += 100;
+                gems += 10;
             }
         }
         // --- ROLLING KILLS ---
@@ -2335,15 +2682,68 @@ Text prompt(font); // Pass font here
             }
         }
 
-        // --- PLAYER DEATH DETECTION ---
-        for (int i = 0; i < MAX_ENEMIES; i++) {
-            // Only living, un-frozen enemies can kill the player
-            if (!enemies[i].isAlive() || enemies[i].isFrozen() || enemies[i].isDying()) continue;
+        // --- PLAYER DEATH DETECTION & INVINCIBILITY ---
+        play.updateInvincibility(); // Tick the blink/shield timer
+ 
+        if (lives > 0 && !play.isInvincible()) {
+            bool playerHit = false;
+            // 1. Check basic enemies
+            for (int i = 0; i < MAX_ENEMIES; i++) {
+                if (!enemies[i].isAlive() || enemies[i].isFrozen() || enemies[i].isDying()) continue;
+                if (play.boun().findIntersection(enemies[i].boun())) {
+                    playerHit = true; break;
+                }
+            }
+            // 2. Check Foogas
+            if (!playerHit) {
+                for (int i = 0; i < 4; i++) {
+                    if (!fooga[i].isAlive() || fooga[i].isFrozen() || fooga[i].isDying()) continue;
+                    if (play.boun().findIntersection(fooga[i].boun())) {
+                        playerHit = true; break;
+                    }
+                }
+            }
 
-            if (play.boun().findIntersection(enemies[i].boun())) {
-                db.saveProgress(username,levelNo,lives-1,gems,score);
-                currentState = GameState::GameOver;
-                break;
+            if (playerHit) {
+                lives--;
+                if (lives > 0) {
+                    play.setPos(12, 5);
+                    play.startInvincibility();
+                } else {
+                    play.setPos(-999, -999);
+                    if (!isMultiplayer || lives2 <= 0) {
+                        db.saveProgress(username, levelNo, 0, gems, score);
+                        currentState = GameState::GameOver;
+                    }
+                }
+            }
+        }
+
+        // --- PLAYER 2 DEATH DETECTION ---
+        if (isMultiplayer && lives2 > 0 && !play2.isInvincible()) {
+            bool p2Hit = false;
+            for (int i = 0; i < MAX_ENEMIES; i++) {
+                if (!enemies[i].isAlive() || enemies[i].isFrozen() || enemies[i].isDying()) continue;
+                if (play2.boun().findIntersection(enemies[i].boun())) { p2Hit = true; break; }
+            }
+            if (!p2Hit) {
+                for (int i = 0; i < 4; i++) {
+                    if (!fooga[i].isAlive() || fooga[i].isFrozen() || fooga[i].isDying()) continue;
+                    if (play2.boun().findIntersection(fooga[i].boun())) { p2Hit = true; break; }
+                }
+            }
+            if (p2Hit) {
+                lives2--;
+                if (lives2 > 0) {
+                    play2.setPos(12, 7); // Respawn
+                    play2.startInvincibility();
+                } else {
+                    play2.setPos(-999, -999); // Hide off-screen
+                    if (lives <= 0) {
+                         db.saveProgress(username, levelNo, 0, gems, score);
+                         currentState = GameState::GameOver;
+                    }
+                }
             }
         }
 
@@ -2412,42 +2812,83 @@ Text prompt(font); // Pass font here
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             snowballs[i].draw(window);
         }
-        window.draw(play.Draw());
+        if (lives > 0) {
+            window.draw(play.Draw());
+        }
+        if (isMultiplayer && lives2 > 0) {
+            play2.updateInvincibility();
+            play2.applyGravity(tilt, count);
+            window.draw(play2.Draw());
+        }
 
         // --- HUD DRAWING ---
-        // 1. Semi-transparent background bar
         RectangleShape hudBar({ 800.f, 40.f });
         hudBar.setFillColor(Color(0, 0, 0, 160));
         hudBar.setPosition({ 0.f, 0.f });
         window.draw(hudBar);
 
-        Text hudText(font);
-        hudText.setCharacterSize(22);
+        static Texture heartTex, gemTex;
+        static bool iconsLoaded = false;
+        if (!iconsLoaded) {
+            heartTex.loadFromFile("Images/heart.png");
+            gemTex.loadFromFile("Images/gem.png");
+            iconsLoaded = true;
+        }
+
+        Text hudText(font, "", 18);
         hudText.setOutlineColor(Color::Black);
-        hudText.setOutlineThickness(1.5f);
+        hudText.setOutlineThickness(1.2f);
 
-        // Score (Left)
-        hudText.setFillColor(Color(255, 215, 0)); // Gold
+        // Segment 1: Score (0-200)
+        hudText.setFillColor(Color(255, 215, 0));
         hudText.setString("SCORE: " + to_string(score));
-        hudText.setPosition({ 20.f, 5.f });
+        FloatRect scB = hudText.getGlobalBounds();
+        hudText.setPosition({ 100.f - scB.size.x / 2.f, 8.f });
         window.draw(hudText);
 
-        // Level (Mid-Left)
-        hudText.setFillColor(Color::White);
-        hudText.setString("STAGE: " + to_string(levelNo));
-        hudText.setPosition({ 220.f, 5.f });
+        // Segment 2: Stage (200-400)
+        if(!isMultiplayer){
+            hudText.setFillColor(Color::White);
+            hudText.setString("STAGE: " + to_string(levelNo));
+            FloatRect stB = hudText.getGlobalBounds();
+            hudText.setPosition({ 300.f - stB.size.x / 2.f, 8.f });
+            window.draw(hudText);
+        }
+        
+
+        // Lives (P1 - Left of Center)
+        Sprite heart(heartTex);
+        float hScale = 25.f / heartTex.getSize().y;
+        heart.setScale({ hScale, hScale });
+        
+        // Player 1
+        heart.setPosition({ 280.f, 8.f });
+        window.draw(heart);
+        hudText.setFillColor(Color(255, 60, 60));
+        hudText.setString("P1: " + to_string(lives));
+        hudText.setPosition({ 310.f, 8.f });
         window.draw(hudText);
 
-        // Lives (Center)
-        hudText.setFillColor(Color(255, 60, 60)); // Arcade Red
-        hudText.setString("LIVES: " + to_string(lives));
-        hudText.setPosition({ 380.f, 5.f });
-        window.draw(hudText);
+        // Player 2
+        if (isMultiplayer) {
+            heart.setPosition({ 420.f, 8.f });
+            window.draw(heart);
+            hudText.setFillColor(Color(60, 60, 255)); // Blue for P2
+            hudText.setString("P2: " + to_string(lives2));
+            hudText.setPosition({ 450.f, 8.f });
+            window.draw(hudText);
+        }
 
         // Gems (Right)
-        hudText.setFillColor(Color(0, 255, 255)); // Cyan
-        hudText.setString("GEMS: " + to_string(gems));
-        hudText.setPosition({ 620.f, 5.f });
+        Sprite gem(gemTex);
+        float gScale = 25.f / gemTex.getSize().y;
+        gem.setScale({ gScale, gScale });
+        gem.setPosition({ 650.f, 8.f });
+        window.draw(gem);
+
+        hudText.setFillColor(Color(0, 255, 255));
+        hudText.setString("x" + to_string(gems));
+        hudText.setPosition({ 685.f, 8.f });
         window.draw(hudText);
 
         // --- LEVEL COMPLETION CHECK ---
@@ -2473,12 +2914,13 @@ Text prompt(font); // Pass font here
                 spawnEnemies(enemies, levelNo);
                 spawnFoogas(fooga);
                 play.setPos(12, 5);
+                if (isMultiplayer) play2.setPos(12, 7); 
             }
         }
 
         window.display();
-            }
-            break;
+        }
+        break;
 
             case GameState::CharacterSelect:
             {
@@ -2495,7 +2937,8 @@ Text prompt(font); // Pass font here
                         if (keyPressed->code == Keyboard::Key::Enter) {
                             // Apply Stats based on character
                             levelNo = 1;
-                            lives = 2;
+                            lives = 3;
+                            lives2 = 3;
                             score = 0;
                             gems = 100;
                             if (selectedChar == 1) { /* Nick - Default */ }
@@ -2505,47 +2948,41 @@ Text prompt(font); // Pass font here
                             LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
                             spawnEnemies(enemies, levelNo);
                             spawnFoogas(fooga);
-                            play.setPos(12, 5);
-                            currentState = GameState::Playing;
+                             play.setPos(12, 5);
+                             if (isMultiplayer) play2.setPos(12, 7);
+                             currentState = GameState::Playing;
                         }
                         if (keyPressed->code == Keyboard::Key::Escape) currentState = GameState::MainMenu;
                     }
                 }
 
                 window.clear(Color(30, 30, 60));
-                Text selectTitle(font);
-                selectTitle.setCharacterSize(40);
+                Text selectTitle(font, "SELECT YOUR SNOWMAN", 40);
                 selectTitle.setFillColor(Color::Yellow);
-                selectTitle.setString("SELECT YOUR SNOWMAN");
                 selectTitle.setPosition({ 150.f, 50.f });
                 window.draw(selectTitle);
 
                 // Nick
-                Text nick(font);
-                nick.setString("NICK\nSPEED: 1.0\nRANGE: 1.0");
+                Text nick(font, "NICK\nSPEED: 1.0\nRANGE: 1.0");
                 nick.setPosition({ 100.f, 200.f });
                 nick.setFillColor(selectedChar == 1 ? Color::Cyan : Color::White);
                 window.draw(nick);
 
                 // Tom
-                Text tom(font);
-                tom.setString("TOM\nSPEED: 1.5\nRANGE: 0.8");
+                Text tom(font, "TOM\nSPEED: 1.5\nRANGE: 0.8");
                 tom.setPosition({ 350.f, 200.f });
                 tom.setFillColor(selectedChar == 2 ? Color::Cyan : Color::White);
                 window.draw(tom);
 
                 // SnowB
-                Text snowb(font);
-                snowb.setString("SNOWB\nSPEED: 0.8\nRANGE: 1.5");
+                Text snowb(font, "SNOWB\nSPEED: 0.8\nRANGE: 1.5");
                 snowb.setPosition({ 600.f, 200.f });
                 snowb.setFillColor(selectedChar == 3 ? Color::Cyan : Color::White);
                 window.draw(snowb);
 
-                Text prompt(font);
-                prompt.setCharacterSize(18);
-                prompt.setString("USE ARROWS TO NAVIGATE | ENTER TO START");
-                prompt.setPosition({ 180.f, 500.f });
-                window.draw(prompt);
+                Text promptTxt(font, "USE ARROWS TO NAVIGATE | ENTER TO START", 18);
+                promptTxt.setPosition({ 180.f, 500.f });
+                window.draw(promptTxt);
 
                 window.display();
             }
@@ -2614,10 +3051,8 @@ Text prompt(font); // Pass font here
                 menuBox.setPosition({ 200.f, 125.f });
                 window.draw(menuBox);
 
-                Text pauseText(font);
-                pauseText.setCharacterSize(50);
+                Text pauseText(font, "PAUSED", 50);
                 pauseText.setFillColor(Color::Yellow);
-                pauseText.setString("PAUSED");
                 pauseText.setStyle(Text::Bold);
                 FloatRect pBounds = pauseText.getGlobalBounds();
                 pauseText.setPosition({ (800.f - pBounds.size.x) / 2.f, 150.f });
@@ -2715,15 +3150,17 @@ Text prompt(font); // Pass font here
 
                         if (keyPressed->code == Keyboard::Key::Enter) {
                             if (hoveredOption == 1) {
-                                // Reset to Level 1
+                                // Reset Game State
                                 levelNo = 1;
-                                lives = 2;
+                                lives = 3;
+                                lives2 = 3;
                                 score = 0;
                                 gems = 100;
                                 LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
                                 spawnEnemies(enemies, levelNo);
                                 spawnFoogas(fooga);
                                 play.setPos(12, 5);
+                                if (isMultiplayer) play2.setPos(12, 7);
                                 currentState = GameState::Playing;
                             } else {
                                 currentState = GameState::MainMenu;

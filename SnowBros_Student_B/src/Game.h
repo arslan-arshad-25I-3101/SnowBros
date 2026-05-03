@@ -6,9 +6,12 @@ using namespace std;
 using namespace sf;
 enum class GameState
 {
+    Login,
+    Signup,
     FlashScreen,
     MainMenu,
     CharacterSelect,
+    LevelSelect,
     Shop,
     Ranking,
     Playing,
