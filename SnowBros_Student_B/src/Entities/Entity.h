@@ -1,48 +1,30 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-
-
-
-class Entity {
-protected:
-    sf::Sprite* sprite;
-    sf::Vector2f position;
-    sf::FloatRect bounds;
-    float velocityY;
-    float gravity;
-    bool onGround;
-
+#include <SFML/Audio.hpp>
+#include<iostream>
+using namespace std;
+using namespace sf;
+class Entity
+{
 public:
-    Entity() : sprite(nullptr), velocityY(0.f), gravity(0.5f), onGround(false) {}
-    virtual ~Entity() {
-        if (sprite) {
-            delete sprite;
-            sprite = nullptr;
-        }
-    }
+    virtual ~Entity() = default;
+    virtual void Update(float deltaTime) = 0;
+    virtual void Draw(sf::RenderWindow& window) = 0;
+    virtual sf::Vector2f GetPosition() const;
+    virtual void SetPosition(const sf::Vector2f& pos);
 
-    virtual void Draw(sf::RenderWindow& window) {
-        if (sprite) {
-            window.draw(*sprite);
-        }
-    }
+    virtual sf::FloatRect GetHitBox() const;
 
-    virtual void setPos(float x, float y) {
-        if (sprite) {
-            sprite->setPosition({ x, y });
-        }
-    }
+ 
+    bool IsActive() const;
 
-    virtual sf::Vector2f getPosition() const {
-        return sprite ? sprite->getPosition() : sf::Vector2f(0.f, 0.f);
-    }
+    void Deactivate();
 
-    virtual sf::FloatRect boun() const {
-        return sprite ? sprite->getGlobalBounds() : sf::FloatRect();
-    }
+protected:
+    Entity(const sf::Vector2f& position = sf::Vector2f(0, 0));
 
-    virtual void applyGravity(class Tiles* tiles, int tileCount) = 0;
-    virtual void update() = 0;
+    sf::Vector2f position;      
+    sf::Vector2f velocity;      
+    sf::FloatRect hitbox;       
+    bool active;                
 };
-
-
