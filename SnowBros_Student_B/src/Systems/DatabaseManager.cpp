@@ -71,10 +71,19 @@ void DatabaseManager::saveProgress(string username, int level, int lives, int ge
             getline(ss, savedUser, ',');
 
             if (savedUser == username) {
-                // Replace this user's entry with updated stats
+                // Read the existing score so we can keep the higher one
+                string temp;
+                getline(ss, temp, ','); // level
+                getline(ss, temp, ','); // lives
+                getline(ss, temp, ','); // gems
+                int existingScore = 0;
+                if (getline(ss, temp, ',')) existingScore = atoi(temp.c_str());
+
+                int bestScore = (score > existingScore) ? score : existingScore;
+
                 lines[lineCount] = username + "," + to_string(level) + "," +
                                    to_string(lives) + "," + to_string(gems) + "," +
-                                   to_string(score);
+                                   to_string(bestScore);
                 found = true;
             } else {
                 lines[lineCount] = line;
