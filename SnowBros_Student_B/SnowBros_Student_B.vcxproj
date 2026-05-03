@@ -155,30 +155,14 @@
     <ClCompile Include="src\Systems\ShopManager.cpp" />
     <ClCompile Include="src\Systems\ScoreManager.cpp" />
     <ClCompile Include="src\Systems\EventBus.cpp" />
-    <ClCompile Include="src\Game.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".gitignore" />
-    <None Include="00_START_HERE_FIRST.md" />
-    <None Include="ACTION_ITEMS.md" />
-    <None Include="COMPLETE_PACKAGE.md" />
-    <None Include="FINAL_CHECKLIST.md" />
-    <None Include="GIT_WORKFLOW.md" />
-    <None Include="MAIN_BRANCH_CHECKLIST.md" />
-    <None Include="MAIN_READY_SUMMARY.md" />
-    <None Include="PROJECT_STRUCTURE.md" />
-    <None Include="QUICK_REFERENCE.md" />
     <None Include="README.md" />
-    <None Include="SETUP_GUIDE.md" />
-    <None Include="START_HERE.md" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="DESIGN_DOCUMENT.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FlyingEnemy.h" />
-    <ClInclude Include="FlyingFooga.h" />
-    <ClInclude Include="Gamakichi.h" />
     <ClInclude Include="src\Levels\LevelData.h" />
     <ClInclude Include="src\Maps\TileMap.h" />
     <ClInclude Include="src\Systems\AuthManager.h" />
@@ -186,7 +170,6 @@
     <ClInclude Include="src\Systems\EventBus.h" />
     <ClInclude Include="ENTITY_TEMPLATE.h" />
     <ClInclude Include="src\Entities\Entity.h" />
-    <ClInclude Include="src\Game.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
