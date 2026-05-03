@@ -4,12 +4,20 @@
 #include<cmath>
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <fstream>
 #include "src/Levels/LevelData.h"
 #include "src/Systems/DatabaseManager.h"
+#include "src/Systems/ShopManager.h"
 
 
 using namespace std;
 using namespace sf;
+
+// Global Power-up states
+bool hasSpeedBoost = false;
+bool hasSnowballPower = false;
+bool hasDistanceIncrease = false;
+bool hasBalloonMode = false;
 
 // Forward declaration for Tiles
 //class Tiles;
@@ -181,7 +189,14 @@ public:
             freezeClock.restart(); // restart timer for next melt stage
         }
     }
-    void freeze() {
+    void freeze(bool full = false) {
+        if (full) {
+            frozenIndex = 3; // Max ice stage
+            frozen = true;
+            freezeClock.restart();
+            return;
+        }
+
         if (frozen) {
             // Already frozen — stack more ice (max frame 3)
             if (frozenIndex < 3) {
@@ -247,6 +262,7 @@ public:
     }
     enum GravityState { NORMAL, JUMPING_UP };
     GravityState currentState = NORMAL;
+    void setGravity(float g) { gravity = g; }
     void applyGravity(Tiles* tiles, int tileCount) {
         velocityY += gravity;
         float limit = enemy->getPosition().y + velocityY;
@@ -804,8 +820,9 @@ public:
         if (pos.x > 800.f) snowball.setPosition({ 0.f, pos.y });
         if (pos.x < 0.f)   snowball.setPosition({ 800.f, pos.y });
 
-        // End projectile after short range
-        if (pos.y > 600.f || clock.getElapsedTime().asSeconds() > 0.6f) {
+        // End projectile after short range (or long range if power-up active)
+        float maxTime = hasDistanceIncrease ? 2.5f : 0.6f;
+        if (pos.y > 600.f || clock.getElapsedTime().asSeconds() > maxTime) {
             active = false;
         }
     }
@@ -819,24 +836,22 @@ public:
     }
 };
 
-bool snowballHitsEnemy(Snowball& snowball, Botom& enemy) {
+bool snowballHitsEnemy(Snowball& snowball, Botom& enemy, bool hasPower) {
     if (!snowball.active) return false;
-    // No isFrozen() guard — additional hits stack more ice layers
 
     if (snowball.getBounds().findIntersection(enemy.boun())) {
-        enemy.freeze();
+        enemy.freeze(hasPower);
         return true;
     }
 
     return false;
 }
 
-bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileCount) {
+bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileCount, bool hasPower) {
     if (!snowball.active) return false;
-    // No isFrozen() guard — additional hits stack more ice layers
 
     if (snowball.getBounds().findIntersection(enemy.boun())) {
-        enemy.freeze();
+        enemy.freeze(hasPower);
         enemy.applyGravity(tiles, tileCount);
         return true;
     }
@@ -848,8 +863,7 @@ bool snowballHitsEnemy(Snowball& snowball, Fooga& enemy, Tiles* tiles, int tileC
 
 class Player : public Botom {
 protected:
-    float playerScale = 1.f;
-
+    float movementSpeed = 2.25f;
 
 public:
     Player() {
@@ -867,6 +881,7 @@ public:
         enemy->setOrigin({ tex[0].getSize().x / 2.f, tex[0].getSize().y / 2.f });
     }
 
+    void setSpeed(float s) { movementSpeed = s; }
 
     void applyGravity(Tiles* tiles, int tileCount) {
         velocityY += gravity;
@@ -890,9 +905,9 @@ public:
     void move(Keyboard::Key key, Tiles* tiles, int tileCount) {
 
         if (key == Keyboard::Key::A) {
-            enemy->move({ -2.25f, -0.0f });
+            enemy->move({ -movementSpeed, -0.0f });
             if (checkCollision(tiles, tileCount)) {
-                enemy->move({ 2.25f, -0.0f }); // undo movement
+                enemy->move({ movementSpeed, -0.0f }); // undo movement
             } else {
                 enemy->setScale({ playerScale, playerScale });
                 if (clocks.getElapsedTime().asSeconds() > frametime) {
@@ -905,9 +920,9 @@ public:
             }
         }
         if (key == Keyboard::Key::D) {
-            enemy->move({ +2.25f, -0.0f });
+            enemy->move({ +movementSpeed, -0.0f });
             if (checkCollision(tiles, tileCount)) {
-                enemy->move({ -2.25f, -0.0f }); // undo movement
+                enemy->move({ -movementSpeed, -0.0f }); // undo movement
             } else {
                 enemy->setScale({ -playerScale, playerScale });
                 if (clocks.getElapsedTime().asSeconds() > frametime) {
@@ -1026,15 +1041,28 @@ EnemySpawnPoint levelSpawns[10][6] = {
     { {4,3}, {4,10}, {6,4}, {8,4}, {10,4}, {10,10} }
 };
 
+void spawnFoogas(Fooga* foogas) {
+    float fx = 177.f / 2.f;
+    float fy = 180.f / 2.f;
+    for (int i = 0; i < 4; i++) {
+        foogas[i].reset();
+    }
+    foogas[0].setPos(155.f, 125.f, fx, fy);
+    foogas[1].setPos(355.f, 125.f, fx, fy);
+    foogas[2].setPos(155.f, 275.f, fx, fy);
+    foogas[3].setPos(555.f, 275.f, fx, fy);
+}
+
 void spawnEnemies(Botom* enemies, int levelNo) {
     EnemySpawnPoint* spawns = levelSpawns[levelNo - 1];
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 6; i++) {
+        enemies[i].reset();
         enemies[i].setPos(spawns[i].row, spawns[i].col);
         enemies[i].setmv1(rand() % 2 == 0);
     }
 }
 
-GameState currentState = GameState::MainMenu;
+GameState currentState = GameState::FlashScreen;
 
 int main()
 {
@@ -1050,16 +1078,22 @@ cout<<"Enter your password: " <<endl;
 cin>>password;
 
     DatabaseManager db;
-    int lives = 2, gems = 0, score = 0, count = 0;
+    ShopManager shop; // Our new shop manager!
+
+    int lives = 2, gems = 100, score = 0, count = 0; // Starting with 100 gems for testing
     int levelNo = 1;
+
+    // Timers for shop items
+    Clock speedBoostTimer;
+    Clock balloonTimer;
 switch(choice){
     case 1:
         if(db.verifyLogin(username, password)){
             db.LoadUser(username, levelNo, lives, gems, score);
         }
         else {
-            cout<<"You username or password is incorrect or you are not registered.\n";
-            return 0;
+            cout<<"Your username or password is incorrect or you are not registered.\n";
+            //return 0;
         }
     break;
     
@@ -1108,42 +1142,365 @@ switch(choice){
     //------------- Foogas ---------------
     int num = 4;
     Fooga fooga[4];
-    float fx = 177.f / 2.f;
-    float fy = 180.f / 2.f;
-    fooga[0].setPos(155.f, 125.f, fx, fy);
-    fooga[1].setPos(355.f, 125.f, fx, fy);
-    fooga[2].setPos(155.f, 275.f, fx, fy);
-    fooga[3].setPos(555.f, 275.f, fx, fy);
+    spawnFoogas(fooga);
     window.setFramerateLimit(60);
 
+    Font font;
+    if (!font.openFromFile("Fonts/snow-bros.ttf")) {
+        // Fallback or error handling could go here
+    }
+
+    
+
+    Text title(font);  // Pass font here
+Text prompt(font); // Pass font here
+
+
+    title.setString("SNOW BROS");
+    title.setCharacterSize(100);
+    title.setFillColor(Color::White);
+    title.setStyle(Text::Bold);
+    // Center title (approximate for 800x600)
+    title.setPosition({ 150.f, 150.f });
+
+
+
+    prompt.setString("Press ENTER to Start");
+    prompt.setCharacterSize(30);
+    prompt.setFillColor(Color::Yellow);
+    prompt.setPosition({ 250.f, 400.f });
+
+    //flash screen  
+    Texture flashTexture;
+    if (!flashTexture.loadFromFile("Images/Flash_Screen.png")) {
+        cout<<" FLASH SCREEN WALI IMAGE NHI HAI NOOBn\n";
+        return -1;
+    }
+    Sprite flashSprite(flashTexture);
+    float scaleX = 800.f / flashTexture.getSize().x;
+    float scaleY = 600.f / flashTexture.getSize().y;
+    flashSprite.setScale({scaleX, scaleY});
+
+    //main menu 
+    Texture mainMenuTexture;
+    if (!mainMenuTexture.loadFromFile("Images/main_menu.png")) {
+        // This handles if the image is missing
+        cout<<" MAIN MENU WALI IMAGE NHI HAI NOOB\n";
+        return -1;
+    }
+    Sprite mainMenuSprite(mainMenuTexture);
+    float mainMenuScaleX = 800.f / mainMenuTexture.getSize().x;
+    float mainMenuScaleY = 600.f / mainMenuTexture.getSize().y;
+    mainMenuSprite.setScale({mainMenuScaleX, mainMenuScaleY});
+
+    /// SHOP Screen
+    Texture shopTexture;
+    if (!shopTexture.loadFromFile("Images/shop.png")) {
+
+        cout<<" SHOP SCREEN WALI IMAGE NHI HAI NOOB\n";
+        return -1;
+    }
+    Sprite shopSprite(shopTexture);
+    float shopScaleX = 800.f / shopTexture.getSize().x;
+    float shopScaleY = 600.f / shopTexture.getSize().y;
+    shopSprite.setScale({shopScaleX, shopScaleY});
     while (window.isOpen())
     {
         switch (currentState) {
-            case GameState::MainMenu:
+            case GameState::FlashScreen:
             {
-        while (true)
-        {
-            auto event = window.pollEvent();
-            if (!event.has_value())
-                break;
+                while (true)
+                {
+                    auto event = window.pollEvent();
+                    if (!event.has_value())
+                        break;
 
-            if (event->is<Event::Closed>())
-                window.close();
-                }
+                    if (event->is<Event::Closed>())
+                        window.close();
 
-                if (Keyboard::isKeyPressed(Keyboard::Key::Enter)) {
-                    currentState = GameState::Playing;
+                    // Transition on key press event (happens only once)
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Enter || keyPressed->code == Keyboard::Key::Space) {
+                            currentState = GameState::MainMenu;
+                        }
+                    }
                 }
 
                 window.clear(Color::Black);
-                // For now, we'll just show a black screen. 
-                // Once you have a font, we'll draw "Press Enter to Start"
+                window.draw(flashSprite);
+
+                Text pressEnter(font);
+                pressEnter.setString("PRESS ENTER TO START");
+                pressEnter.setCharacterSize(20);
+                pressEnter.setFillColor(Color::White);
+                pressEnter.setPosition({ 280.f, 500.f });
+                
+                // Simple blink effect
+                if ((int)(flashSprite.getColor().a) % 2 == 0) { // Just a placeholder for time-based logic
+                     window.draw(pressEnter);
+                }
+
+                window.display();
+            }
+            break;
+            case GameState::MainMenu:
+            {
+                // Corrected Mapping: 1 Play, 2 Multi, 3 Shop, 4 Lead, 5 Exit
+                FloatRect btnPlay({ 336.f, 242.f }, { 129.f, 31.f });       
+                FloatRect btnContinue({ 500.f, 242.f }, { 120.f, 31.f });
+                FloatRect btnMulti({ 333.f, 279.f }, { 135.f, 29.f });     
+                FloatRect btnShop({ 370.f, 316.f }, { 70.f, 29.f });       // Moved up (Option 3)
+                FloatRect btnLeader({ 333.f, 353.f }, { 135.f, 29.f });    // Moved down (Option 4)
+                FloatRect btnExit({ 328.f, 390.f }, { 144.f, 25.f });      // Option 5
+
+                Vector2f mousePos = window.mapPixelToCoords(Mouse::getPosition(window));
+                int hoveredOption = 0; 
+
+                if (btnPlay.contains(mousePos)) hoveredOption = 1;
+                else if (btnMulti.contains(mousePos)) hoveredOption = 2;
+                else if (btnShop.contains(mousePos)) hoveredOption = 3;
+                else if (btnLeader.contains(mousePos)) hoveredOption = 4;
+                else if (btnExit.contains(mousePos)) hoveredOption = 5;
+                else if (levelNo > 1 && btnContinue.contains(mousePos)) hoveredOption = 6;
+
+                while (true)
+                {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+
+                    if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
+                        if (mousePressed->button == Mouse::Button::Left) {
+                            if (hoveredOption == 1) currentState = GameState::CharacterSelect;
+                            if (hoveredOption == 2) { /* Multiplayer */ }
+                            if (hoveredOption == 3) currentState = GameState::Shop;
+                            if (hoveredOption == 4) currentState = GameState::Ranking;
+                            if (hoveredOption == 5) window.close(); 
+                            if (hoveredOption == 6) {
+                                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                                spawnEnemies(enemies, levelNo);
+                                spawnFoogas(fooga);
+                                play.setPos(12, 5);
+                                currentState = GameState::Playing;
+                            }
+                        }
+                    }
+                }
+
+                window.clear(Color::Black);
+                window.draw(mainMenuSprite);
+                if (levelNo > 1) {
+                    Text continueText(font);
+                    continueText.setString("CONTINUE");
+                    continueText.setCharacterSize(20);
+                    continueText.setFillColor(hoveredOption == 6 ? Color::Cyan : Color::White);
+                    continueText.setPosition({ 505.f, 245.f });
+                    window.draw(continueText);
+                }
+                window.display();
+            }
+            break;
+
+            case GameState::Ranking:
+            {
+                struct Entry { string name; int level; int score; };
+                Entry topPlayers[100];
+                int playerCount = 0;
+
+                ifstream file("progress.txt");
+                if (file.is_open()) {
+                    string line;
+                    while (getline(file, line) && playerCount < 100) {
+                        if (line.empty()) continue;
+                        stringstream ss(line);
+                        string name, temp;
+                        getline(ss, name, ',');
+                        
+                        int lvl = 0;
+                        if (getline(ss, temp, ',')) lvl = atoi(temp.c_str());
+                        getline(ss, temp, ','); // lives
+                        getline(ss, temp, ','); // gems
+                        int sc = 0;
+                        if (getline(ss, temp, ',')) sc = atoi(temp.c_str());
+                        
+                        topPlayers[playerCount++] = { name, lvl, sc };
+                    }
+                    file.close();
+                }
+
+                // Bubble Sort (Descending)
+                for (int i = 0; i < playerCount - 1; i++) {
+                    for (int j = 0; j < playerCount - i - 1; j++) {
+                        if (topPlayers[j].score < topPlayers[j + 1].score) {
+                            Entry t = topPlayers[j];
+                            topPlayers[j] = topPlayers[j + 1];
+                            topPlayers[j + 1] = t;
+                        }
+                    }
+                }
+
+                while (const auto event = window.pollEvent()) {
+                    if (event->is<Event::Closed>()) window.close();
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Escape || keyPressed->code == Keyboard::Key::Enter) {
+                            currentState = GameState::MainMenu;
+                        }
+                    }
+                }
+
+                window.clear(Color(20, 20, 40));
+                Text leadText(font);
+                leadText.setCharacterSize(45);
+                leadText.setFillColor(Color::Yellow);
+                leadText.setString("HALL OF FAME");
+                leadText.setPosition({ 240.f, 40.f });
+                window.draw(leadText);
+
+                leadText.setCharacterSize(25);
+                leadText.setFillColor(Color::Cyan);
+                leadText.setString("RANK    NAME         LEVEL    SCORE");
+                leadText.setPosition({ 100.f, 120.f });
+                window.draw(leadText);
+
+                leadText.setFillColor(Color::White);
+                int show = (playerCount < 5) ? playerCount : 5;
+                for (int i = 0; i < show; i++) {
+                    string rankStr = to_string(i + 1);
+                    if (i == 0) rankStr = "1ST";
+                    else if (i == 1) rankStr = "2ND";
+                    else if (i == 2) rankStr = "3RD";
+                    else rankStr += "TH";
+
+                    string nameStr = topPlayers[i].name;
+                    if (nameStr.length() < 12) nameStr.append(12 - nameStr.length(), ' ');
+
+                    leadText.setString(rankStr + "     " + nameStr + "  " + to_string(topPlayers[i].level) + "        " + to_string(topPlayers[i].score));
+                    leadText.setPosition({ 100.f, 180.f + i * 50.f });
+                    window.draw(leadText);
+                }
+
+                Text backPrompt(font);
+                backPrompt.setCharacterSize(18);
+                backPrompt.setFillColor(Color(180, 180, 180));
+                backPrompt.setString("PRESS ENTER TO RETURN");
+                backPrompt.setPosition({ 280.f, 520.f });
+                window.draw(backPrompt);
+
+                window.display();
+            }
+            break;
+
+            case GameState::Shop:
+            {
+                // Define Hitboxes
+                FloatRect item1({ 122.f, 378.f }, { 72.f, 25.f }); // width = 194-122, height = 403-378
+                FloatRect item2({ 241.f, 378.f }, { 73.f, 25.f });
+                FloatRect item3({ 365.f, 378.f }, { 70.f, 25.f });
+                FloatRect item4({ 487.f, 378.f }, { 68.f, 25.f });
+                FloatRect item5({ 607.f, 378.f }, { 71.f, 25.f });
+                FloatRect shopExit({ 319.f, 536.f }, { 162.f, 46.f });
+
+                Vector2f mousePos = window.mapPixelToCoords(Mouse::getPosition(window));
+                int shopHover = 0;
+                if (item1.contains(mousePos)) shopHover = 1;
+                else if (item2.contains(mousePos)) shopHover = 2;
+                else if (item3.contains(mousePos)) shopHover = 3;
+                else if (item4.contains(mousePos)) shopHover = 4;
+                else if (item5.contains(mousePos)) shopHover = 5;
+                else if (shopExit.contains(mousePos)) shopHover = 6;
+
+                while (true)
+                {
+                    auto event = window.pollEvent();
+                    if (!event.has_value())
+                        break;
+
+                    if (event->is<Event::Closed>())
+                        window.close();
+
+                    if (const auto* mousePressed = event->getIf<Event::MouseButtonPressed>()) {
+                        if (mousePressed->button == Mouse::Button::Left) {
+                            if (shopHover == 1) {
+                                if (shop.buyExtraLife(gems, lives)) {
+                                    cout << "Purchased Extra Life! Lives: " << lives << endl;
+                                }
+                            }
+                            else if (shopHover == 2) {
+                                if (shop.buySpeedBoost(gems, hasSpeedBoost)) {
+                                    cout << "Speed Boost Activated!" << endl;
+                                    play.setSpeed(3.5f); // Set high speed
+                                    speedBoostTimer.restart(); // Start 30s timer
+                                }
+                            }
+                            else if (shopHover == 3) {
+                                if (shop.buySnowballPower(gems, hasSnowballPower)) {
+                                    cout << "Snowball Power Activated!" << endl;
+                                }
+                            }
+                            else if (shopHover == 4) {
+                                if (shop.buyDistanceIncrease(gems, hasDistanceIncrease)) {
+                                    cout << "Distance Increase Activated!" << endl;
+                                }
+                            }
+                            else if (shopHover == 5) {
+                                if (shop.buyBalloonMode(gems, hasBalloonMode)) {
+                                    cout << "Balloon Mode Activated!" << endl;
+                                    play.setGravity(0.25f); // Half gravity
+                                    balloonTimer.restart();
+                                }
+                            }
+                            if (shopHover == 6) currentState = GameState::MainMenu;
+                        }
+                    }
+
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Escape) {
+                            currentState = GameState::MainMenu;
+                        }
+                    }
+                }
+
+                // --- SHOP COORDINATE HELPER ---
+                // cout << "SHOP Mouse X: " << mousePos.x << " | Mouse Y: " << mousePos.y << "\r" << flush;
+
+                window.clear(Color::Black);
+                window.draw(shopSprite);
+
+                // Draw Gem Count
+                Text gemText(font);
+                gemText.setString("GEMS: " + to_string(gems));
+                gemText.setCharacterSize(30);
+                gemText.setFillColor(Color::Yellow);
+                gemText.setPosition({ 581.f,388.f }); // Position based on your coords 581, 388
+                window.draw(gemText);
+
+                // Draw Selector snowball on hover
+                if (shopHover > 0 && shopHover <= 5) {
+                    CircleShape selector(5.f);
+                    selector.setFillColor(Color::White);
+                    // Just a simple visual for now
+                    selector.setPosition({ mousePos.x - 15.f, mousePos.y });
+                    window.draw(selector);
+                }
+
                 window.display();
             }
             break;
 
             case GameState::Playing:
             {
+                // Check Power-up Timers
+                if (hasSpeedBoost && speedBoostTimer.getElapsedTime().asSeconds() > 30.f) {
+                    hasSpeedBoost = false;
+                    play.setSpeed(2.25f); // Reset to normal speed
+                    cout << "Speed Boost Expired!" << endl;
+                }
+                if (hasBalloonMode && balloonTimer.getElapsedTime().asSeconds() > 30.f) {
+                    hasBalloonMode = false;
+                    play.setGravity(0.5f); // Reset to normal gravity
+                    cout << "Balloon Mode Expired!" << endl;
+                }
+
                 while (true)
                 {
                     auto event = window.pollEvent();
@@ -1154,6 +1511,9 @@ switch(choice){
                         window.close();
             
             if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                if (keyPressed->code == Keyboard::Key::P || keyPressed->code == Keyboard::Key::Escape) {
+                    currentState = GameState::Paused;
+                }
                 if (keyPressed->code == Keyboard::Key::N) {
                     levelNo++;
                     if (levelNo > 10)
@@ -1193,7 +1553,7 @@ switch(choice){
 
             for (int j = 0; j < MAX_ENEMIES; j++) { // checking for collision between snowball and enemy
                 if (!enemies[j].isAlive()) continue;
-                if (snowballHitsEnemy(snowballs[i], enemies[j])) {
+                if (snowballHitsEnemy(snowballs[i], enemies[j], hasSnowballPower)) {
                     snowballs[i].active = false; // consume the snowball on hit
                     break;
                 }
@@ -1203,43 +1563,17 @@ switch(choice){
         for (int i = 0; i < MAX_SNOWBALLS; i++) {
             if (!snowballs[i].active)
                 continue;
-
+ 
             for (int j = 0; j < 4; j++) { // checking for collision between snowball and enemy
                 if (!fooga[j].isAlive()) continue;
-                if (snowballHitsEnemy(snowballs[i], fooga[j], tilt, count)) {
+                if (snowballHitsEnemy(snowballs[i], fooga[j], tilt, count, hasSnowballPower)) {
                     snowballs[i].active = false; // consume the snowball on hit
                     break;
                 }
             }
         }
-		/// are all enemies dead? if yes, next level
-        for (int i = 0; i < MAX_ENEMIES; i++) {
-            if (enemies[i].isAlive() || enemies[i].isDying()) {
-                break; // at least one enemy is still alive, don't load next level
-            }
-            else if(i == MAX_ENEMIES - 1) {
-				for (int j = 0; j < MAX_ENEMIES; j++) {
-                    enemies[j].reset();
-                }
-                levelNo++;
-                if (levelNo > 10)
-                    // need to implement winning screen etc here later
-                    levelNo = 1;
-                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
-                play.setPos(12, 5);
-                spawnEnemies(enemies, levelNo);
-            }
-        }
-        //are all the foogas ded?
-        // ------------- BTW THIS WAS CAUSING ERRORS SO WILL FIX LATER ------------------
-        //for (int i = 0; i < 4; i++) {
-        //    if (fooga[i].isAlive() || fooga[i].isDying()) {
-        //        break; 
-        //    }
-        //    else if (i == 4 - 1) {
-        //        for (int j = 0; j < 4; j++) {
-        //            enemies[j].reset();
-        //        }
+        // --- UPDATED LEVEL COMPLETION LOGIC IS BELOW IN THE DRAWING SECTION ---
+
         //        levelNo++;
         //        if (levelNo > 10)
         //           
@@ -1300,6 +1634,9 @@ switch(choice){
                 if (fooga[j].isRolling()) continue;
                 if (fooga[i].boun().findIntersection(fooga[j].boun())) {
                     fooga[j].kill();
+                }
+            }
+        }
 
         // --- PLAYER DEATH DETECTION ---
         for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -1369,33 +1706,274 @@ switch(choice){
         }
         window.draw(play.Draw());
 
+        // --- HUD DRAWING ---
+        Text hudText(font);
+        hudText.setCharacterSize(20);
+        hudText.setFillColor(Color::White);
+        hudText.setOutlineColor(Color::Black);
+        hudText.setOutlineThickness(2.f);
+
+        // Score
+        hudText.setString("SCORE: " + to_string(score));
+        hudText.setPosition({ 20.f, 10.f });
+        window.draw(hudText);
+
+        // Lives
+        hudText.setString("LIVES: " + to_string(lives));
+        hudText.setPosition({ 350.f, 10.f });
+        window.draw(hudText);
+
+        // Gems
+        hudText.setString("GEMS: " + to_string(gems));
+        hudText.setPosition({ 650.f, 10.f });
+        window.draw(hudText);
+
+        // --- LEVEL COMPLETION CHECK ---
+        bool allDead = true;
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            if (enemies[i].isAlive()) { allDead = false; break; }
+        }
+        if (allDead) {
+            for (int i = 0; i < 4; i++) {
+                if (fooga[i].isAlive()) { allDead = false; break; }
+            }
+        }
+
+        if (allDead) {
+            levelNo++;
+            if (levelNo > 10) {
+                // Game Won!
+                currentState = GameState::Victory;
+                levelNo = 1;
+            } else {
+                db.saveProgress(username, levelNo, lives, gems, score);
+                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                spawnEnemies(enemies, levelNo);
+                spawnFoogas(fooga);
+                play.setPos(12, 5);
+            }
+        }
+
         window.display();
+            }
+            break;
+
+            case GameState::CharacterSelect:
+            {
+                int selectedChar = 1; // 1 = Nick, 2 = Tom, 3 = SnowB
+                if (Keyboard::isKeyPressed(Keyboard::Key::Left)) selectedChar = 1;
+                if (Keyboard::isKeyPressed(Keyboard::Key::Down)) selectedChar = 2;
+                if (Keyboard::isKeyPressed(Keyboard::Key::Right)) selectedChar = 3;
+
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Enter) {
+                            // Apply Stats based on character
+                            levelNo = 1;
+                            lives = 2;
+                            score = 0;
+                            gems = 100;
+                            if (selectedChar == 1) { /* Nick - Default */ }
+                            if (selectedChar == 2) { /* Tom - Faster */ play.setSpeed(3.0f); }
+                            if (selectedChar == 3) { /* SnowB - Range */ }
+                            
+                            LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                            spawnEnemies(enemies, levelNo);
+                            spawnFoogas(fooga);
+                            play.setPos(12, 5);
+                            currentState = GameState::Playing;
+                        }
+                        if (keyPressed->code == Keyboard::Key::Escape) currentState = GameState::MainMenu;
+                    }
+                }
+
+                window.clear(Color(30, 30, 60));
+                Text selectTitle(font);
+                selectTitle.setCharacterSize(40);
+                selectTitle.setFillColor(Color::Yellow);
+                selectTitle.setString("SELECT YOUR SNOWMAN");
+                selectTitle.setPosition({ 150.f, 50.f });
+                window.draw(selectTitle);
+
+                // Nick
+                Text nick(font);
+                nick.setString("NICK\nSPEED: 1.0\nRANGE: 1.0");
+                nick.setPosition({ 100.f, 200.f });
+                nick.setFillColor(selectedChar == 1 ? Color::Cyan : Color::White);
+                window.draw(nick);
+
+                // Tom
+                Text tom(font);
+                tom.setString("TOM\nSPEED: 1.5\nRANGE: 0.8");
+                tom.setPosition({ 350.f, 200.f });
+                tom.setFillColor(selectedChar == 2 ? Color::Cyan : Color::White);
+                window.draw(tom);
+
+                // SnowB
+                Text snowb(font);
+                snowb.setString("SNOWB\nSPEED: 0.8\nRANGE: 1.5");
+                snowb.setPosition({ 600.f, 200.f });
+                snowb.setFillColor(selectedChar == 3 ? Color::Cyan : Color::White);
+                window.draw(snowb);
+
+                Text prompt(font);
+                prompt.setCharacterSize(18);
+                prompt.setString("USE ARROWS TO NAVIGATE | ENTER TO START");
+                prompt.setPosition({ 180.f, 500.f });
+                window.draw(prompt);
+
+                window.display();
+            }
+            break;
+
+            case GameState::Paused:
+            {
+                int hoveredOption = 1; // 1 = Resume, 2 = Menu
+                if (Keyboard::isKeyPressed(Keyboard::Key::Up)) hoveredOption = 1;
+                if (Keyboard::isKeyPressed(Keyboard::Key::Down)) hoveredOption = 2;
+
+                while (true)
+                {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Enter) {
+                            if (hoveredOption == 1) currentState = GameState::Playing;
+                            else currentState = GameState::MainMenu;
+                        }
+                        if (keyPressed->code == Keyboard::Key::P || keyPressed->code == Keyboard::Key::Escape) {
+                            currentState = GameState::Playing;
+                        }
+                    }
+                }
+
+                // Draw game state in background (optional, but looks good)
+                // Since we are in a separate loop, we'd need to redraw the game objects or just clear
+                window.clear(Color::Black);
+                window.draw(background);
+                
+                // Dim overlay
+                RectangleShape dim({ 800.f, 600.f });
+                dim.setFillColor(Color(0, 0, 0, 150));
+                window.draw(dim);
+
+                Text pauseText(font);
+                pauseText.setCharacterSize(60);
+                pauseText.setFillColor(Color::White);
+                pauseText.setString("PAUSED");
+                pauseText.setPosition({ 280.f, 150.f });
+                window.draw(pauseText);
+
+                pauseText.setCharacterSize(30);
+                pauseText.setString("RESUME");
+                pauseText.setPosition({ 340.f, 300.f });
+                pauseText.setFillColor(hoveredOption == 1 ? Color::Yellow : Color::White);
+                window.draw(pauseText);
+
+                pauseText.setString("MAIN MENU");
+                pauseText.setPosition({ 320.f, 360.f });
+                pauseText.setFillColor(hoveredOption == 2 ? Color::Yellow : Color::White);
+                window.draw(pauseText);
+
+                window.display();
+            }
+            break;
+
+            case GameState::Victory:
+            {
+                while (true) {
+                    auto event = window.pollEvent();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Enter || keyPressed->code == Keyboard::Key::Escape) {
+                            currentState = GameState::MainMenu;
+                        }
+                    }
+                }
+
+                window.clear(Color(0, 100, 0)); // Dark Green for Victory
+                Text winText(font);
+                winText.setCharacterSize(50);
+                winText.setFillColor(Color::Yellow);
+                winText.setString("CONGRATULATIONS!");
+                winText.setPosition({ 150.f, 150.f });
+                window.draw(winText);
+
+                winText.setCharacterSize(30);
+                winText.setFillColor(Color::White);
+                winText.setString("YOU SAVED THE SNOW WORLD!");
+                winText.setPosition({ 180.f, 250.f });
+                window.draw(winText);
+
+                winText.setString("FINAL SCORE: " + to_string(score));
+                winText.setPosition({ 250.f, 350.f });
+                window.draw(winText);
+
+                winText.setCharacterSize(20);
+                winText.setString("PRESS ENTER FOR MAIN MENU");
+                winText.setPosition({ 250.f, 500.f });
+                window.draw(winText);
+
+                window.display();
             }
             break;
 
             case GameState::GameOver:
             {
+                int hoveredOption = 1; // 1 = Retry, 2 = Menu
+                if (Keyboard::isKeyPressed(Keyboard::Key::Up)) hoveredOption = 1;
+                if (Keyboard::isKeyPressed(Keyboard::Key::Down)) hoveredOption = 2;
+
                 while (true)
                 {
                     auto event = window.pollEvent();
-                    if (!event.has_value())
-                        break;
-
-                    if (event->is<Event::Closed>())
-                        window.close();
+                    if (!event.has_value()) break;
+                    if (event->is<Event::Closed>()) window.close();
+                    
+                    if (const auto* keyPressed = event->getIf<Event::KeyPressed>()) {
+                        if (keyPressed->code == Keyboard::Key::Enter) {
+                            if (hoveredOption == 1) {
+                                // Retry Level 1
+                                levelNo = 1;
+                                lives = 2;
+                                score = 0;
+                                gems = 100;
+                                LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
+                                spawnEnemies(enemies, levelNo);
+                                spawnFoogas(fooga);
+                                play.setPos(12, 5);
+                                currentState = GameState::Playing;
+                            } else {
+                                currentState = GameState::MainMenu;
+                            }
+                        }
+                    }
                 }
 
-                if (Keyboard::isKeyPressed(Keyboard::Key::Enter)) {
-                    // Restart logic
-                    levelNo = 1;
-                    LoadLevel(levelNo, currentLevel, bgTex, background, tilt, count);
-                    play.setPos(12, 5);
-                    for (int i = 0; i < MAX_ENEMIES; i++) enemies[i].reset();
-                    spawnEnemies(enemies, levelNo);
-                    currentState = GameState::Playing;
-                }
+                window.clear(Color(100, 0, 0)); // Dark Red
+                Text loseText(font);
+                loseText.setCharacterSize(60);
+                loseText.setFillColor(Color::White);
+                loseText.setString("GAME OVER");
+                loseText.setPosition({ 220.f, 100.f });
+                window.draw(loseText);
 
-                window.clear(Color::Red); // Show red for Game Over
+                loseText.setCharacterSize(30);
+                loseText.setString("RETRY");
+                loseText.setPosition({ 350.f, 300.f });
+                loseText.setFillColor(hoveredOption == 1 ? Color::Yellow : Color::White);
+                window.draw(loseText);
+
+                loseText.setString("MAIN MENU");
+                loseText.setPosition({ 320.f, 360.f });
+                loseText.setFillColor(hoveredOption == 2 ? Color::Yellow : Color::White);
+                window.draw(loseText);
+
                 window.display();
             }
             break;

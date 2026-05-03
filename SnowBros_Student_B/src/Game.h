@@ -6,11 +6,15 @@ using namespace std;
 using namespace sf;
 enum class GameState
 {
+    FlashScreen,
     MainMenu,
     CharacterSelect,
+    Shop,
+    Ranking,
     Playing,
     Paused,
     LevelComplete,
+    Victory,
     GameOver
 };
 

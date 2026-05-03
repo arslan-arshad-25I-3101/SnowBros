@@ -18,7 +18,7 @@ bool DatabaseManager::registerUser(string username, string password) {
     }
     
     // 3. Write the user to the file (Format: username,password)
-    file << username << "," << password << endl;
+    file << username << "," << hashPassword(password) << endl;
     
     file.close();
 
@@ -27,13 +27,14 @@ bool DatabaseManager::registerUser(string username, string password) {
 
 bool DatabaseManager::verifyLogin(string username, string password) {
     // 1. Open the file in "read" mode
-    ifstream file("progress.txt");
+    ifstream file("users.txt");
     
     if (!file.is_open()) {
         return false;
     }
     
     string line;
+    password = hashPassword(password);
     // 2. Read the file line by line
     while (getline(file, line)) {
         
@@ -55,20 +56,49 @@ bool DatabaseManager::verifyLogin(string username, string password) {
     return false; // Wrong username or password
 }
 
-
 void DatabaseManager::saveProgress(string username, int level, int lives, int gems, int score) {
-    // 1. Open "progress.txt" in append mode
-    ofstream file("progress.txt", ios::app);
-    // 2. Check if the file is open
-    if(!file.is_open()){
-        return;
+    // Read all existing entries
+    ifstream fileIn("progress.txt");
+    string lines[100];
+    int lineCount = 0;
+    bool found = false;
+
+    if (fileIn.is_open()) {
+        string line;
+        while (getline(fileIn, line) && lineCount < 100) {
+            stringstream ss(line);
+            string savedUser;
+            getline(ss, savedUser, ',');
+
+            if (savedUser == username) {
+                // Replace this user's entry with updated stats
+                lines[lineCount] = username + "," + to_string(level) + "," +
+                                   to_string(lives) + "," + to_string(gems) + "," +
+                                   to_string(score);
+                found = true;
+            } else {
+                lines[lineCount] = line;
+            }
+            lineCount++;
+        }
+        fileIn.close();
     }
-    
-    // 3. Write the data separated by commas:
-    // Format: username,level,lives,gems,score
-    file<< username <<"," <<level << "," << lives << "," << gems << "," << score << endl;
-    // 4. Close the file
-    file.close();
+
+    // If user wasn't found, add them as a new entry
+    if (!found) {
+        lines[lineCount++] = username + "," + to_string(level) + "," +
+                             to_string(lives) + "," + to_string(gems) + "," +
+                             to_string(score);
+    }
+
+    // Write everything back (overwrite mode)
+    ofstream fileOut("progress.txt");
+    if (fileOut.is_open()) {
+        for (int i = 0; i < lineCount; i++) {
+            fileOut << lines[i] << "\n";
+        }
+        fileOut.close();
+    }
 }
 
 void DatabaseManager::LoadUser(string username, int &level, int &lives, int &gems, int &score){
@@ -105,4 +135,32 @@ void DatabaseManager::LoadUser(string username, int &level, int &lives, int &gem
             score = stoi(temp);
         }
     }
+}
+
+void DatabaseManager::saveScoreToLeaderBoard(string username, int score){
+    
+    ofstream file("leaderboard.txt",ios::app);
+
+    if(!file.is_open()){
+        return;
+    }
+
+    file << username << "," << score << endl;
+    
+    file.close();
+    
+}
+
+void DatabaseManager::LoadLeaderBoard(string filename){
+    
+}
+
+string DatabaseManager::hashPassword(string password){
+    
+    unsigned long hash = 6769;
+
+    for (char c : password){
+        hash = hash*33 + c;
+    }
+    return to_string(hash);
 }
